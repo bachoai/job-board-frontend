@@ -1,0 +1,16 @@
+import { useEffect, useState } from "react";
+import { BriefcaseBusiness, LogOut, Menu, X, UserRound, FileText, ClipboardList, Building2 } from "lucide-react";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { useAuth } from "../app/providers/useAuth";
+export function PublicLayout() {
+  const { session, logout, busy } = useAuth(); const location = useLocation(); const [menu, setMenu] = useState(false);
+  useEffect(() => { setMenu(false); window.scrollTo(0, 0); document.title = "Jobboard | Việc làm và cơ hội nghề nghiệp"; }, [location.pathname]);
+  const candidate = session?.user.role === "candidate";
+  const home = session?.user.role === "admin" ? "/admin/users" : session?.user.role === "employer" ? "/employer/jobs" : "/me";
+  const nav = [ { to: "/jobs", title: "Việc làm", icon: BriefcaseBusiness }, { to: "/companies", title: "Công ty", icon: Building2 }, ...(candidate ? [ { to: "/me", title: "Hồ sơ", icon: UserRound }, { to: "/me/resumes", title: "CV của tôi", icon: FileText }, { to: "/me/applications", title: "Đơn đã nộp", icon: ClipboardList } ] : []) ];
+  return <div className="public-layout"><a className="skip-link" href="#public-content">Đến nội dung chính</a><header className="public-header"><div className="public-header-inner"><Link className="brand" to="/jobs" aria-label="Jobboard trang chủ"><span className="brand-icon"><BriefcaseBusiness size={22}/></span>Jobboard<span className="brand-dot">.</span></Link>
+    <nav className={`public-nav${menu ? " open" : ""}`} aria-label="Điều hướng chính">{nav.map(({ to, title, icon: Icon }) => <NavLink key={to} to={to} end={to === "/me"} className={({isActive}) => `public-nav-item${isActive ? " active" : ""}`} onClick={() => setMenu(false)}><Icon size={17}/>{title}</NavLink>)}<div className="public-mobile-auth">{session ? <button onClick={() => void logout()} disabled={busy}><LogOut size={16}/> Đăng xuất</button> : <><Link to="/login">Đăng nhập</Link><Link to="/register">Đăng ký</Link></>}</div></nav>
+    <div className="public-account">{session ? <><Link className="public-account-name" to={home}><span className="public-avatar">{session.user.fullName.charAt(0).toUpperCase()}</span><span>{session.user.fullName}</span></Link><button className="public-logout" title="Đăng xuất" aria-label="Đăng xuất" disabled={busy} onClick={() => void logout()}><LogOut size={18}/></button></> : <><Link className="public-signin" to="/login">Đăng nhập</Link><Link className="primary public-signup" to="/register">Đăng ký</Link></>}</div>
+    <button type="button" className="public-menu-button" aria-label={menu ? "Đóng menu" : "Mở menu"} aria-expanded={menu} onClick={() => setMenu(!menu)}>{menu ? <X size={22}/> : <Menu size={22}/>}</button>
+  </div></header><div id="public-content" className="public-main"><Outlet/></div><footer className="public-footer"><div><Link to="/jobs" className="public-footer-brand"><BriefcaseBusiness size={20}/> Jobboard.</Link><p>Kết nối tài năng với cơ hội nghề nghiệp.</p></div><div><Link to="/jobs">Việc làm</Link><Link to="/companies">Công ty</Link><Link to={candidate ? "/me/resumes" : "/register"}>{candidate ? "Quản lý CV" : "Tham gia"}</Link></div><span>© 2026 Jobboard</span></footer></div>;
+}
