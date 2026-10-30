@@ -1,7 +1,5 @@
 ﻿# Jobboard Frontend — Employer & Admin
 
-Giao diện phần B1–B9 được hoàn thiện từ bản hiện có theo phong cách Modern SaaS Dashboard: primary `#2563EB`, nền `#F8FAFC`, surface trắng, text `#0F172A` và hệ thống trạng thái success/warning/danger. Backend `D:\code\job-board-backend` được giữ nguyên.
-
 ## Chạy ứng dụng
 
 Yêu cầu Node.js 24+ và npm. Nếu chưa có `.env`:
@@ -98,21 +96,6 @@ src/
 ```
 
 `Feedback.tsx`, `ConfirmAction.tsx` và `JobEditor.tsx` giữ các export tương thích với mã cũ; phần triển khai hiện nằm trong các component có tên rõ ràng. `App.tsx` chỉ gắn provider/router và CSS. Khi ghép phần A, dùng AuthProvider/guard của nhóm hoặc đồng bộ về cùng `jobboard.session`; không cần sửa từng page.
-
-## Các trang và chức năng
-
-| Phần     | Route                             | Chức năng                                                                                     |
-| -------- | --------------------------------- | --------------------------------------------------------------------------------------------- |
-| B1       | `/employer/company`               | Chọn công ty, tạo/sửa thông tin, kiểm tra tên và website, hiển thị hồ sơ đã lưu               |
-| B2       | `/employer/jobs/new`              | Chọn công ty, form đăng tin, validation, xem trước, lưu bản nháp theo tài khoản trong tab     |
-| B3       | `/employer/jobs/:id/edit`         | Điền sẵn, sửa tin, giữ công ty và tiền tệ, đóng tin có xác nhận                               |
-| B4       | `/employer/jobs`                  | Tin của mình ở mọi trạng thái, ngày đăng/hạn nộp/số hồ sơ, tìm/lọc/phân trang, sửa/đóng/xóa   |
-| B5       | `/employer/jobs/:id/applications` | Hồ sơ của một tin, tìm/lọc/phân trang, mở chi tiết                                            |
-| B6       | `/employer/applications/:id`      | CV, thư giới thiệu, trạng thái, ghi chú và lịch sử xử lý                                      |
-| B7       | `/admin/users`                    | Người dùng, vai trò/trạng thái, tìm/lọc/phân trang, khóa/xóa có xác nhận                      |
-| B8       | `/admin/jobs`                     | Mọi tin và trạng thái, số liệu tổng hợp, xem nội dung, chặn/xóa                               |
-| B9       | `/admin/companies`                | Thông tin công ty, tìm/phân trang, website và xóa có cảnh báo dữ liệu liên quan               |
-| Tổng hợp | `/employer/applications`          | Hồ sơ từ mọi tin của tài khoản, lọc theo vị trí và trạng thái, số liệu lấy từ dữ liệu thực tế |
 
 Mọi thao tác lỗi đều hiển thị thông báo API; không giả báo thành công. Tin bị chặn không sửa được, hồ sơ đã từ chối không đổi lại được, ngày nộp mới không được nằm trong quá khứ. Các trạng thái theo enum backend; giá trị lạ dùng badge trung tính. Không có tính năng AI.
 
