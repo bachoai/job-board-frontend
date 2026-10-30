@@ -1,7 +1,7 @@
-﻿import { API_BASE_URL } from "../../../lib/axios";
+import { apiBlob } from "../../../lib/api";
 import { applicationStatuses } from "../../../components/common/statuses";
 import { formatDate, routeId } from "../../../components/common/format";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ApplicationStatusForm as StatusPanel } from "../components/ApplicationStatusForm";
 import {
@@ -14,71 +14,43 @@ import { StatusBadge } from "../../../components/common/StatusBadge";
 import { useResource } from "../../../components/common/useResource";
 import { employerApi } from "../api";
 
-function resumeUrl(path: string) {
-  try {
-    const base = new URL(API_BASE_URL);
-    const url = new URL(path, `${base.origin}/`);
-    return ["http:", "https:"].includes(url.protocol) &&
-      url.origin === base.origin &&
-      url.pathname.startsWith("/uploads/")
-      ? url.href
-      : null;
-  } catch {
-    return null;
-  }
-}
+// Backend serves CV only through authenticated GET /resumes/:id/file.
+// The previous public /uploads/ link and GET /resumes/:id do not exist.
 function ResumePanel({ id }: { id: number }) {
   const resource = useResource(
-    useCallback((signal: AbortSignal) => employerApi.resume(id, signal), [id]),
+    useCallback((signal: AbortSignal) => apiBlob(`/resumes/${id}/file`, signal), [id]),
   );
-  const url = resource.data && resumeUrl(resource.data.fileUrl);
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    if (!resource.data) return;
+    const next = URL.createObjectURL(resource.data);
+    setUrl(next);
+    return () => URL.revokeObjectURL(next);
+  }, [resource.data]);
+  const pdf = resource.data?.type.toLowerCase().includes("pdf");
+  const download = () => {
+    if (!url) return;
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `CV-${id}.${pdf ? "pdf" : "docx"}`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+  };
   return (
     <section className="card">
       <h2>CV đính kèm</h2>
-      {resource.loading ? (
-        <Loading />
-      ) : resource.error ? (
-        <ErrorMessage message={resource.error} retry={resource.reload} />
-      ) : (
-        resource.data && (
-          <>
-            <div className="resume-info">
-              <span className="document-icon">CV</span>
-              <div>
-                <strong>{resource.data.fileName}</strong>
-                <p>
-                  {resource.data.fileSize
-                    ? `${Math.ceil(resource.data.fileSize / 1024)} KB`
-                    : "Tài liệu ứng viên"}
-                </p>
-              </div>
-              {url && (
-                <a
-                  className="secondary"
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Mở CV ↗
-                </a>
-              )}
-            </div>
-            {!url && (
-              <ErrorMessage message="Đường dẫn CV không hợp lệ hoặc chưa sẵn sàng." />
-            )}
-            {url && resource.data.mimeType === "application/pdf" && (
-              <iframe
-                className="cv-preview"
-                title={`Xem CV ${resource.data.fileName}`}
-                src={url}
-              />
-            )}
-            {url && resource.data.mimeType !== "application/pdf" && (
-              <p className="hint">Mở hoặc tải tài liệu Word để xem nội dung.</p>
-            )}
-          </>
-        )
-      )}
+      {resource.loading ? <Loading/> : resource.error ? (
+        <ErrorMessage message={resource.error} retry={resource.reload}/>
+      ) : resource.data ? <>
+        <div className="resume-info">
+          <span className="document-icon">CV</span>
+          <div><strong>CV #{id}</strong><p>Tệp đính kèm của ứng viên</p></div>
+          <button className="secondary" disabled={!url} onClick={download}>Tải CV</button>
+        </div>
+        {pdf && url ? <iframe className="cv-preview" title={`Xem CV #${id}`} src={url}/> :
+          <p className="hint">Tài liệu Word có thể tải về để xem nội dung.</p>}
+      </> : null}
     </section>
   );
 }

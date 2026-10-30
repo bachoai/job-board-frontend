@@ -1,4 +1,4 @@
-﻿import { expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import type { Page, Route } from "@playwright/test";
 const session = (role = "employer") => ({
   accessToken: `header.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })).toString("base64url")}.sig`,
@@ -98,16 +98,8 @@ async function setup(page: Page, path: string, role = "employer") {
       return json(route, [application]);
     if (path === "/api/applications/30") return json(route, application);
     if (path === "/api/applications/30/history") return json(route, []);
-    if (path === "/api/resumes/40")
-      return json(route, {
-        id: 40,
-        userId: 8,
-        fileName: "cv.docx",
-        fileUrl: "/uploads/cv.docx",
-        mimeType:
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        fileSize: 2048,
-      });
+    if (path === "/api/resumes/40/file")
+      return route.fulfill({ status: 200, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", body: "mock-word-cv" });
     if (path === "/api/users") return json(route, users);
     return json(
       route,
@@ -261,10 +253,7 @@ test("B5 filters applicants by status and opens B6 detail with CV", async ({
   await page.getByRole("link", { name: "Xem hồ sơ →" }).click();
   await expect(page).toHaveURL(/\/employer\/applications\/30$/);
   await expect(page.getByText(application.coverLetter)).toBeVisible();
-  await expect(page.getByRole("link", { name: "Mở CV ↗" })).toHaveAttribute(
-    "href",
-    "http://localhost:3000/uploads/cv.docx",
-  );
+  await expect(page.getByRole("button", { name: "Tải CV" })).toBeEnabled();
 });
 
 test("B6 rejection saves status/note/history and makes rejected status final", async ({
@@ -494,7 +483,7 @@ test("B6 missing CV is recoverable and does not prevent reviewing the applicatio
   page,
 }) => {
   await setup(page, "/employer/applications/30");
-  await page.route("**/api/resumes/40", (route) =>
+  await page.route("**/api/resumes/40/file", (route) =>
     json(route, { message: "CV không còn tồn tại" }, 404),
   );
   await page.reload();

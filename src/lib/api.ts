@@ -1,5 +1,6 @@
-﻿import axios from "axios";
+import axios from "axios";
 import { axiosInstance } from "./axios";
+import { apiErrorMessage, requestLabel } from "./api-error-message";
 export interface Session {
   accessToken: string;
   refreshToken: string;
@@ -46,7 +47,7 @@ export class ApiError extends Error {
 }
 
 const expiredMessage =
-  "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại; nội dung tin của bạn được giữ trong tab này.";
+  "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
 let refreshing: Promise<Session> | null = null;
 
 type ApiOptions = RequestInit & { auth?: boolean };
@@ -58,7 +59,7 @@ async function request<T>(
 ): Promise<T> {
   const headers = new Headers(options.headers);
   headers.set("Accept", "application/json");
-  if (options.body) headers.set("Content-Type", "application/json");
+  if (options.body && !(options.body instanceof FormData)) headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
   let response;
@@ -79,26 +80,15 @@ async function request<T>(
       throw new ApiError("Máy chủ phản hồi quá lâu. Vui lòng thử lại.", 0);
     }
     throw new ApiError(
-      "Không thể kết nối máy chủ. Vui lòng kiểm tra kết nối và thử lại.",
+      `Không thể kết nối API (${requestLabel(options.method || "GET", path)}). Kiểm tra backend đã chạy, địa chỉ API trong .env của frontend và cấu hình CORS.`,
       0,
     );
   }
 
   const body = response.data;
   if (response.status < 200 || response.status >= 300) {
-    const record =
-      body && typeof body === "object" ? (body as Record<string, unknown>) : {};
-    const nested =
-      record.error && typeof record.error === "object"
-        ? (record.error as Record<string, unknown>)
-        : {};
-    const message = record.message || nested.message || record.error;
     throw new ApiError(
-      Array.isArray(message)
-        ? message.join(" · ")
-        : typeof message === "string"
-          ? message
-          : "Không thể thực hiện yêu cầu. Vui lòng thử lại.",
+      apiErrorMessage(body, response.status, options.method || "GET", path),
       response.status,
     );
   }
@@ -173,5 +163,48 @@ export async function api<T>(
       throw new ApiError(expiredMessage, 401);
     }
     throw err;
+  }
+}
+
+/** Download protected CV as a Blob. Never expose the user's token in a URL. */
+export async function apiBlob(path: string, signal?: AbortSignal): Promise<Blob> {
+  const session = await usableSession();
+  if (!session) throw new ApiError("Vui lòng đăng nhập để xem CV.", 401);
+  try {
+    const response = await axiosInstance.get<Blob>(path, {
+      headers: { Authorization: `Bearer ${session.accessToken}` },
+      responseType: "blob",
+      signal,
+    });
+    if (response.status < 200 || response.status >= 300) {
+      let message = "Không thể tải tệp CV.";
+      try {
+        const body: unknown = JSON.parse(await response.data.text());
+        if (body && typeof body === "object" && "message" in body) {
+          const detail = (body as { message: unknown }).message;
+          if (typeof detail === "string") message = detail;
+        }
+      } catch { /* Binary or unparsable response. */ }
+      throw new ApiError(
+        apiErrorMessage({ message }, response.status, "GET", path),
+        response.status,
+      );
+    }
+    return response.data;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(
+      `Không thể tải tệp CV (${requestLabel("GET", path)}). Kiểm tra kết nối đến backend.`,
+      0,
+    );
+  }
+}
+
+/** Proactive no-op for healthy tokens; refreshes before expiry without a data request. */
+export async function renewSessionIfNeeded() {
+  try { await usableSession(); }
+  catch (error) {
+    if (error instanceof ApiError && error.status === 401) clearSession(expiredMessage);
+    throw error;
   }
 }

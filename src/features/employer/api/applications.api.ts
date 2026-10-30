@@ -1,5 +1,5 @@
-﻿import { api } from "../../../lib/api";
-import type { Application, ApplicationHistory, Resume } from "../types";
+import { api } from "../../../lib/api";
+import type { Application, ApplicationHistory } from "../types";
 import { jobsApi } from "./jobs.api";
 export const applicationsApi = {
   applications: (jobId: number, signal?: AbortSignal) =>
@@ -16,8 +16,6 @@ export const applicationsApi = {
         ...(note.trim() ? { note: note.trim() } : {}),
       }),
     }),
-  resume: (id: number, signal?: AbortSignal) =>
-    api<Resume>(`/resumes/${id}`, { signal }),
   async allApplications(ownerId: number, signal: AbortSignal) {
     const jobs = await jobsApi.myJobs(ownerId, signal);
     const batches = [];

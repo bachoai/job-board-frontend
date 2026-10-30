@@ -6,7 +6,7 @@ import {
   ShieldCheck,
   Check,
 } from "lucide-react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../providers/useAuth";
 import { ErrorMessage } from "../../components/common/Feedback";
 
@@ -15,7 +15,7 @@ export function ProtectedRoute({
   role,
   children,
 }: {
-  role: "employer" | "admin";
+  role: "candidate" | "employer" | "admin";
   children: ReactNode;
 }) {
   const { session, error, busy, login } = useAuth();
@@ -32,14 +32,15 @@ export function ProtectedRoute({
       );
       if (!location.pathname.startsWith(`/${result.user.role}/`))
         navigate(
-          result.user.role === "admin" ? "/admin/users" : "/employer/jobs",
+          result.user.role === "admin" ? "/admin/users" : result.user.role === "candidate" ? "/me" : "/employer/jobs",
           { replace: true },
         );
     } catch {
       /* The existing auth provider supplies the error message. */
     }
   }
-  if (!session || !["employer", "admin"].includes(session.user.role))
+  if (!session && role === "candidate") return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  if (!session)
     return (
       <main className="session-screen">
         <section className="session-intro">
@@ -145,11 +146,11 @@ export function ProtectedRoute({
         <h1>Không có quyền truy cập</h1>
         <p>
           Trang này dành cho{" "}
-          {role === "admin" ? "quản trị viên" : "nhà tuyển dụng"}.
+          {role === "admin" ? "quản trị viên" : role === "candidate" ? "ứng viên" : "nhà tuyển dụng"}.
         </p>
         <Link
           className="primary"
-          to={session.user.role === "admin" ? "/admin/users" : "/employer/jobs"}
+          to={session.user.role === "admin" ? "/admin/users" : session.user.role === "candidate" ? "/me" : "/employer/jobs"}
         >
           Về không gian của bạn →
         </Link>

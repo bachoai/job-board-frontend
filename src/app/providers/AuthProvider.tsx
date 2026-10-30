@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   api,
@@ -6,6 +6,7 @@ import {
   getSession,
   saveSession,
   SESSION_EVENT,
+  renewSessionIfNeeded,
 } from "../../lib/api";
 import type { Session } from "../../lib/api";
 import { AuthContext } from "./auth-context";
@@ -41,10 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         body: JSON.stringify({ email: email.trim(), password }),
       });
-      if (!["employer", "admin"].includes(result.user?.role))
-        throw new Error(
-          "Vui lòng sử dụng tài khoản nhà tuyển dụng hoặc quản trị viên.",
-        );
+      if (!["candidate", "employer", "admin"].includes(result.user?.role))
+        throw new Error("Tài khoản có vai trò không hợp lệ.");
       saveSession(result);
       setSession(result);
       return result;
@@ -56,6 +55,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setBusy(false);
     }
   }
+  async function register(body: {
+    email: string; password: string; confirmPassword: string;
+    fullName: string; role: "candidate" | "employer";
+  }) {
+    if (pending.current) throw new Error("Đang xử lý yêu cầu.");
+    pending.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await api<Session>("/auth/register", {
+        auth: false,
+        method: "POST",
+        body: JSON.stringify({ ...body, email: body.email.trim(), fullName: body.fullName.trim() }),
+      });
+      saveSession(result);
+      setSession(result);
+      return result;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thể đăng ký.");
+      throw err;
+    } finally {
+      pending.current = false;
+      setBusy(false);
+    }
+  }
+  // Refresh proactively while the app is open, including during idle periods.
+  useEffect(() => {
+    if (!session) return;
+    const renew = () => { void renewSessionIfNeeded().catch(() => {}); };
+    renew();
+    const handle = window.setInterval(renew, 30000);
+    return () => window.clearInterval(handle);
+  }, [session?.user.id]);
   async function logout() {
     if (busy || submittingJob) return;
     setBusy(true);
@@ -83,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         submittingJob,
         setSubmittingJob,
         login,
+        register,
         logout,
       }}
     >

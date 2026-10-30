@@ -9,7 +9,10 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "node --experimental-strip-types --test src/features/employer/components/job-form.test.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:a": "node --experimental-strip-types --test src/features/candidate/utils/resume-validation.test.mjs",
+    "test:errors": "node --experimental-strip-types --test tests/api-error-message.test.mjs",
+    "test:api": "node --test tests/public-api-real.test.mjs"
   },
   "dependencies": {
     "axios": "^1.21.0",
