@@ -34,6 +34,7 @@ test("payload omits blank optional fields and preserves numeric zero", () => {
       title: "Developer",
       jobType: "full_time",
       currency: "VND",
+      skillIds: [],
       salaryMin: 0,
     },
   );
@@ -47,4 +48,14 @@ test("editing preserves an unchanged expired deadline but rejects a newly chosen
   assert.ok(
     validateJob({ ...valid, deadline: "2000-01-02" }, "2000-01-01").deadline,
   );
+});
+
+test("skills use positive unique numeric IDs and allow clearing every selection", () => {
+  for (const skillIds of [[0], [-1], [1.5], ["2"], [2, 2], null])
+    assert.ok(validateJob({ ...valid, skillIds }).skillIds);
+  const skillIds = [17, 88];
+  assert.deepEqual(validateJob({ ...valid, skillIds }), {});
+  assert.deepEqual(jobPayload({ ...valid, skillIds }).skillIds, [17, 88]);
+  assert.notEqual(jobPayload({ ...valid, skillIds }).skillIds, skillIds);
+  assert.deepEqual(jobPayload(valid).skillIds, []);
 });

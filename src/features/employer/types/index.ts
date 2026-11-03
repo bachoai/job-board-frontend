@@ -10,6 +10,10 @@
   logoPath: string | null;
   createdAt: string;
 }
+export interface Skill {
+  id: number;
+  name: string;
+}
 export interface Job {
   id: number;
   companyId: number;
@@ -26,6 +30,7 @@ export interface Job {
   deadline: string | null;
   status: "open" | "closed" | "blocked";
   createdAt: string;
+  skills?: Skill[];
 }
 export interface Application {
   id: number;

@@ -27,6 +27,7 @@ Chạy backend riêng, mở `/login` hoặc một trang cần dùng và đăng n
 - Card số liệu lấy từ response thực tế, không có biểu đồ tăng trưởng hoặc số liệu giả.
 - Bảng có tiêu đề, số kết quả, tìm kiếm, bộ lọc, phân trang và cuộn ngang trên điện thoại.
 - Form thống nhất label, lỗi, trạng thái focus/disabled; form công ty có thẻ hồ sơ và form tin có xem trước.
+- Form đăng/sửa tin tải danh sách kỹ năng từ `GET /api/skills` có xác thực, cho tìm kiếm và chọn nhiều kỹ năng, lưu lựa chọn trong bản nháp và gửi `skillIds: number[]`. Khi sửa tin, kỹ năng cũ được chọn sẵn; bỏ hết gửi `skillIds: []`. Lỗi tải danh sách có nút thử lại và giữ nội dung form.
 - Xác nhận thao tác, loading, empty/error/success states được dùng chung trên mọi trang.
 - Giữ React + TypeScript + Vite, React Router và CSS của dự án. Thêm Lucide React và dùng Axios đã có sẵn. Giữ logic validation đang hoạt động, không chuyển toàn bộ form sang thư viện khác chỉ để thay giao diện. TypeScript đã bật `strict`.
 - Không tạo trang Public/Candidate hoặc hệ thống Auth mới. Màn hình đăng nhập độc lập đã có ở bản trước được giữ lại và logic của nó được tách vào provider để thuận tiện ghép với phần A.
@@ -78,7 +79,7 @@ src/
 │   │   │   ├── job-form.ts
 │   │   │   ├── job-form.test.mjs
 │   │   │   └── job-draft.ts
-│   │   ├── api/{companies,jobs,applications}.api.ts
+│   │   ├── api/{companies,jobs,applications,skills}.api.ts
 │   │   ├── api/index.ts
 │   │   └── types/index.ts
 │   └── admin/
@@ -102,7 +103,7 @@ Mọi thao tác lỗi đều hiển thị thông báo API; không giả báo th�
 ## Backend hiện tại và các giới hạn giữ nguyên
 
 - **Sửa công ty:** gọi `PATCH /companies/:id` đúng DTO. Controller backend đang truyền `@CurrentUser('id')` vào service cần `currentUser.id/role`, nên có thể trả 403 kể cả đúng chủ công ty. Frontend hiển thị lỗi và giữ nội dung; không thể sửa lỗi này chỉ bằng UI.
-- **Mở khóa người dùng:** backend chỉ có thao tác đặt `isActive=false`, chưa có API mở khóa. Nút mở khóa bị vô hiệu hóa và có giải thích.
+- **Mở khóa người dùng:** admin dùng `PATCH /users/unlock/:id` qua hộp xác nhận. Danh sách và số liệu được cập nhật sau khi API thành công; lỗi API giữ nguyên trạng thái đã khóa và cho phép thử lại.
 - **Email:** cập nhật hồ sơ hiện chỉ ghi dữ liệu và lịch sử; chưa gửi email tự động. Giao diện không hứa email đã được gửi.
 - **Tin của tôi:** chưa có `/jobs/mine`; dùng `/jobs` có Bearer token rồi lọc `createdBy`. Backend cho employer/admin xem mọi trạng thái khi token hợp lệ. Số hồ sơ lấy qua `/applications?jobId=...`, tối đa 4 yêu cầu đồng thời; khi chưa tải được hiển thị `—`.
 - **Ứng viên:** response hồ sơ chỉ có `candidateId`; hiển thị mã ứng viên thay vì bịa họ tên/email hoặc gọi API người dùng mà employer không có quyền.

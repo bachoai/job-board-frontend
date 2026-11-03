@@ -68,10 +68,6 @@ export function UsersPage({ userId }: { userId: number }) {
                 tone="violet"
               />
             </div>
-            <div className="alert">
-              Tài khoản đã khóa hiện chưa thể mở lại. Chức năng mở khóa chưa
-              được hệ thống hỗ trợ.
-            </div>
             <DataTable
               title="Danh sách người dùng"
               filtered={!!role || !!active}
@@ -153,7 +149,7 @@ export function UsersPage({ userId }: { userId: number }) {
                         <ConfirmAction
                           label="Khóa"
                           title="Khóa tài khoản?"
-                          description={`Vô hiệu hóa tài khoản ${user.email}. Tài khoản sẽ không thể đăng nhập mới. Hiện chưa có chức năng mở khóa.`}
+                          description={`Vô hiệu hóa tài khoản ${user.email}. Tài khoản sẽ không thể đăng nhập mới.`}
                           disabled={user.id === userId}
                           onConfirm={async () => {
                             const updated = await adminApi.lockUser(user.id);
@@ -166,13 +162,17 @@ export function UsersPage({ userId }: { userId: number }) {
                           }}
                         />
                       ) : (
-                        <button
-                          className="action-button"
-                          disabled
-                          title="Hệ thống chưa hỗ trợ mở khóa"
-                        >
-                          Mở khóa
-                        </button>
+                        <ConfirmAction
+                          label="Mở khóa"
+                          title="Mở khóa tài khoản?"
+                          description={`Cho phép tài khoản ${user.email} đăng nhập trở lại.`}
+                          onConfirm={async () => {
+                            const updated = await adminApi.unlockUser(user.id);
+                            resource.setData(
+                              (list) => list?.map((item) => item.id === user.id ? updated : item) || [],
+                            );
+                          }}
+                        />
                       )}
                       <ConfirmAction
                         label="Xóa"

@@ -88,6 +88,8 @@ async function setup(page: Page, path: string, role = "employer") {
     if (path === "/api/companies/owner/7")
       return json(route, { data: [company] });
     if (path === "/api/companies") return json(route, [company]);
+    if (path === "/api/jobs/mine") return json(route, [job]);
+    if (path === "/api/skills") return json(route, [{ id: 17, name: "React" }, { id: 88, name: "NestJS" }]);
     if (path === "/api/jobs")
       return json(route, [
         job,
@@ -184,6 +186,32 @@ test("B3 loads job, preserves immutable company/currency and omits unchanged exp
   expect(payload.currency).toBe("USD");
   expect(payload).not.toHaveProperty("companyId");
   expect(payload).not.toHaveProperty("deadline");
+});
+
+test("B3 loads saved skills and sends an empty list when all skills are removed", async ({ page }) => {
+  const savedSkills = [{ id: 17, name: "React" }, { id: 88, name: "NestJS" }];
+  await setup(page, "/employer/jobs/20/edit");
+  const bodies: Record<string, unknown>[] = [];
+  await page.route("**/api/jobs/20", route => {
+    if (route.request().method() === "PATCH") {
+      const body = route.request().postDataJSON();
+      bodies.push(body);
+      return json(route, { ...job, ...body, skills: savedSkills.filter(skill => body.skillIds.includes(skill.id)) });
+    }
+    return json(route, { ...job, skills: savedSkills });
+  });
+  await page.reload();
+  await expect(page.getByRole("checkbox", { name: "React", exact: true })).toBeChecked();
+  await expect(page.getByRole("checkbox", { name: "NestJS", exact: true })).toBeChecked();
+  await page.getByRole("checkbox", { name: "React", exact: true }).uncheck();
+  await page.getByRole("button", { name: "Lưu thay đổi", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Đã lưu thay đổi");
+  expect(bodies[0].skillIds).toEqual([88]);
+  await page.getByRole("button", { name: "Bỏ chọn tất cả", exact: true }).click();
+  await page.getByRole("button", { name: "Lưu thay đổi", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Đã lưu thay đổi");
+  expect(bodies).toHaveLength(2);
+  expect(bodies[1].skillIds).toEqual([]);
 });
 
 test("B3 blocks editing another owner and blocked jobs before rendering the form", async ({
@@ -302,7 +330,7 @@ test("B6 rejection saves status/note/history and makes rejected status final", a
   expect(errors).toEqual([]);
 });
 
-test("B7 locks user, disables unsupported unlocking and deletes only after confirmation", async ({
+test("B7 locks, unlocks and deletes a user only after confirmation", async ({
   page,
 }) => {
   await setup(page, "/admin/users", "admin");
@@ -316,7 +344,22 @@ test("B7 locks user, disables unsupported unlocking and deletes only after confi
   await page.getByRole("button", { name: "Xác nhận", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Mở khóa", exact: true }),
-  ).toBeDisabled();
+  ).toBeEnabled();
+  let unlocks = 0;
+  await page.route("**/api/users/unlock/8", (route) => {
+    expect(route.request().method()).toBe("PATCH");
+    expect(route.request().headers().authorization).toMatch(/^Bearer /);
+    unlocks++;
+    return json(route, users[1]);
+  });
+  await page.getByRole("button", { name: "Mở khóa", exact: true }).click();
+  await page.getByRole("button", { name: "Hủy", exact: true }).click();
+  expect(unlocks).toBe(0);
+  await expect(page.getByRole("cell", { name: "Đã khóa", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Mở khóa", exact: true }).click();
+  await page.getByRole("button", { name: "Xác nhận", exact: true }).click();
+  await expect(page.getByRole("cell", { name: "Hoạt động", exact: true })).toBeVisible();
+  expect(unlocks).toBe(1);
   await page.route("**/api/users/8", (route) =>
     json(route, { message: "Đã xóa" }),
   );
@@ -324,6 +367,25 @@ test("B7 locks user, disables unsupported unlocking and deletes only after confi
   await expect(page.getByRole("dialog")).toContainText("không thể hoàn tác");
   await page.getByRole("button", { name: "Xác nhận", exact: true }).click();
   await expect(page.getByRole("cell", { name: /Ứng viên A/ })).toHaveCount(0);
+});
+
+test("B7 keeps an account locked when unlocking fails and supports retry", async ({ page }) => {
+  await setup(page, "/admin/users", "admin");
+  await page.route("**/api/users", route => json(route, [users[0], { ...users[1], isActive: false }]));
+  await page.reload();
+  const self = page.getByRole("row").filter({ hasText: "admin@example.test" });
+  await expect(self.getByRole("button", { name: "Khóa", exact: true })).toBeDisabled();
+  await expect(self.getByRole("button", { name: "Xóa", exact: true })).toBeDisabled();
+  await page.getByLabel("Tìm theo tên, email, mã người dùng…").fill("candidate@example.test");
+  await page.route("**/api/users/unlock/8", route => json(route, { message: "Chưa thể mở khóa, hãy thử lại" }, 500));
+  await page.getByRole("button", { name: "Mở khóa", exact: true }).click();
+  await page.getByRole("button", { name: "Xác nhận", exact: true }).click();
+  await expect(page.getByRole("dialog").getByRole("alert")).toContainText("Chưa thể mở khóa");
+  await expect(page.getByRole("cell", { name: "Đã khóa", exact: true })).toBeVisible();
+  await page.route("**/api/users/unlock/8", route => json(route, users[1]));
+  await page.getByRole("button", { name: "Xác nhận", exact: true }).click();
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+  await expect(page.getByRole("cell", { name: "Hoạt động", exact: true })).toBeVisible();
 });
 
 test("B8 reviews and blocks a job and reflects filter results", async ({

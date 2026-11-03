@@ -14,6 +14,7 @@ const makeSession = (role = "employer", seconds = 900) => ({
   },
 });
 const company = { id: 12, name: "Công ty Kiểm Thử", ownerId: 7 };
+const skills = [{ id: 17, name: "React" }, { id: 42, name: "TypeScript" }, { id: 88, name: "NestJS" }];
 const json = (route: Route, body: unknown, status = 200) =>
   route.fulfill({
     status,
@@ -28,6 +29,7 @@ async function setup(
     companyStatus?: number;
     loginRole?: string;
     session?: ReturnType<typeof makeSession>;
+    skillsStatus?: number;
   } = {},
 ) {
   const errors: string[] = [];
@@ -39,6 +41,13 @@ async function setup(
     if (path === "/api/auth/login")
       return json(route, makeSession(options.loginRole));
     if (path === "/api/auth/logout") return json(route, { message: "OK" });
+    if (path === "/api/users/me") return json(route, { ...makeSession(options.loginRole).user, phone: null });
+    if (path === "/api/skills") {
+      expect(route.request().headers().authorization).toMatch(/^Bearer /);
+      return options.skillsStatus
+        ? json(route, { message: "Danh sách kỹ năng tạm thời không khả dụng" }, options.skillsStatus)
+        : json(route, skills);
+    }
     if (path === "/api/companies/owner/7")
       return json(
         route,
@@ -102,6 +111,11 @@ test("complete B2 submits exact backend payload once and clears draft on success
   await page.getByLabel("Lương tối thiểu").fill("0");
   await page.getByLabel("Lương tối đa").fill("25000000");
   await page.getByLabel("Hạn nộp hồ sơ").fill("2099-12-31");
+  await page.getByRole("checkbox", { name: "React", exact: true }).check();
+  await page.getByLabel("Tìm kỹ năng").fill("nest");
+  await page.getByRole("checkbox", { name: "NestJS", exact: true }).check();
+  await expect(page.getByLabel("Kỹ năng trong bản xem trước")).toContainText("React");
+  await expect(page.getByLabel("Kỹ năng trong bản xem trước")).toContainText("NestJS");
   await expect(page.locator(".preview-card h2")).toHaveText(
     "Backend Developer",
   );
@@ -132,6 +146,7 @@ test("complete B2 submits exact backend payload once and clears draft on success
     salaryMax: 25000000,
     deadline: "2099-12-31",
     currency: "VND",
+    skillIds: [17, 88],
   });
   expect(
     await page.evaluate(() => sessionStorage.getItem("jobboard.new-job.7")),
@@ -139,7 +154,79 @@ test("complete B2 submits exact backend payload once and clears draft on success
   await page.getByRole("button", { name: "Đăng một tin khác" }).click();
   await expect(page.getByLabel("Tiêu đề tuyển dụng")).toHaveValue("");
   await expect(page.getByLabel("Công ty đăng tuyển")).toHaveValue("12");
+  await expect(page.getByRole("checkbox", { name: "NestJS", exact: true })).not.toBeChecked();
   expect(errors).toEqual([]);
+});
+
+test("skills can be retried without losing the form or submitting it", async ({ page }) => {
+  await setup(page, { session: makeSession(), skillsStatus: 500 });
+  await page.getByLabel("Tiêu đề tuyển dụng").fill("Frontend Engineer");
+  await expect(page.getByRole("alert")).toContainText("Không tải được danh sách kỹ năng");
+  await expect(postButton(page)).toBeDisabled();
+  let posts = 0;
+  await page.route("**/api/jobs", (route) => {
+    posts++;
+    expect(route.request().postDataJSON().skillIds).toEqual([17]);
+    return json(route, { id: 91, title: "Frontend Engineer" }, 201);
+  });
+  await page.route("**/api/skills", (route) => json(route, skills));
+  await page.getByRole("button", { name: "Thử lại", exact: true }).click();
+  await expect(page.getByRole("checkbox", { name: "React", exact: true })).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.getByLabel("Tiêu đề tuyển dụng")).toHaveValue("Frontend Engineer");
+  expect(posts).toBe(0);
+  await page.getByRole("checkbox", { name: "React", exact: true }).check();
+  await postButton(page).click();
+  await expect(page.getByRole("heading", { name: "Tin tuyển dụng đã sẵn sàng." })).toBeVisible();
+  expect(posts).toBe(1);
+});
+
+test("an empty skills catalog allows posting after loading finishes", async ({ page }) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  await setup(page, { session: makeSession(), companyStatus: 404 });
+  await expect(page.getByRole("button", { name: "Tải lại công ty" })).toBeVisible();
+  await page.route("**/api/skills", async route => {
+    await gate;
+    await json(route, []);
+  });
+  await page.route("**/api/companies/owner/7", route => json(route, { data: [company] }));
+  await page.getByRole("button", { name: "Tải lại công ty" }).click();
+  await page.getByLabel("Tiêu đề tuyển dụng").fill("Developer");
+  await expect(page.getByText("Đang tải kỹ năng…", { exact: true })).toBeVisible();
+  await expect(postButton(page)).toBeDisabled();
+  release();
+  await expect(page.getByText("Chưa có kỹ năng trong danh sách.", { exact: false })).toBeVisible();
+  await expect(postButton(page)).toBeEnabled();
+  await page.route("**/api/jobs", route => {
+    expect(route.request().postDataJSON().skillIds).toEqual([]);
+    return json(route, { id: 92, title: "Developer" }, 201);
+  });
+  await postButton(page).click();
+  await expect(page.getByRole("heading", { name: "Tin tuyển dụng đã sẵn sàng." })).toBeVisible();
+});
+
+test("legacy drafts load and unavailable skill IDs can be removed before posting", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("jobboard.new-job.7", JSON.stringify({
+    companyId: "12", title: "Tin từ bản nháp", skillIds: [17, 17, "88", -1, 999],
+  })));
+  await setup(page, { session: makeSession() });
+  await expect(page.getByLabel("Tiêu đề tuyển dụng")).toHaveValue("Tin từ bản nháp");
+  await expect(page.getByRole("checkbox", { name: "React", exact: true })).toBeChecked();
+  await expect(page.getByText("Đã chọn 2 kỹ năng", { exact: true })).toBeVisible();
+  let posts = 0;
+  await page.route("**/api/jobs", route => {
+    posts++;
+    expect(route.request().postDataJSON().skillIds).toEqual([17]);
+    return json(route, { id: 93, title: "Tin từ bản nháp" }, 201);
+  });
+  await postButton(page).click();
+  await expect(page.getByRole("alert")).toContainText("không còn trong danh sách");
+  expect(posts).toBe(0);
+  await page.getByRole("button", { name: "Bỏ kỹ năng #999", exact: true }).click();
+  await postButton(page).click();
+  await expect(page.getByRole("heading", { name: "Tin tuyển dụng đã sẵn sàng." })).toBeVisible();
+  expect(posts).toBe(1);
 });
 
 test("validates title, salary ordering and past deadline without posting", async ({
@@ -208,6 +295,7 @@ test("server error keeps entered data, draft survives reload, and retry succeeds
   await setup(page, { session: makeSession() });
   await expect(page.getByLabel("Công ty đăng tuyển")).toHaveValue("12");
   await page.getByLabel("Tiêu đề tuyển dụng").fill("Tin được giữ lại");
+  await page.getByRole("checkbox", { name: "TypeScript", exact: true }).check();
   await page.route("**/api/jobs", (route) =>
     json(route, { message: "Công ty không thuộc về bạn" }, 403),
   );
@@ -223,6 +311,7 @@ test("server error keeps entered data, draft survives reload, and retry succeeds
   await expect(page.getByLabel("Tiêu đề tuyển dụng")).toHaveValue(
     "Tin được giữ lại",
   );
+  await expect(page.getByRole("checkbox", { name: "TypeScript", exact: true })).toBeChecked();
   await page.route("**/api/jobs", (route) =>
     json(route, { id: 90, title: "Tin được giữ lại" }, 201),
   );
@@ -284,17 +373,16 @@ test("refreshes a still-valid token before posting with the renewed token", asyn
   expect(refreshes).toBeGreaterThanOrEqual(1);
 });
 
-test("wrong role stays on login with an explanation", async ({ page }) => {
+test("candidate accounts cannot access the employer posting form", async ({ page }) => {
   await setup(page, { loginRole: "candidate" });
   await page.getByLabel("Email").fill("candidate@example.test");
   await page.getByLabel("Mật khẩu").fill("test-password");
   await page.getByRole("button", { name: "Đăng nhập →" }).click();
-  await expect(page.getByRole("alert")).toContainText(
-    "tài khoản nhà tuyển dụng",
-  );
-  expect(
-    await page.evaluate(() => localStorage.getItem("jobboard.session")),
-  ).toBeNull();
+  await expect(page).toHaveURL(/\/me$/);
+  await page.goto("/employer/jobs/new");
+  await expect(page.getByRole("heading", { name: "Không có quyền truy cập" })).toBeVisible();
+  await expect(postButton(page)).toHaveCount(0);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("jobboard.session")!).user.role)).toBe("candidate");
 });
 
 test("company network failure has a retry action", async ({ page }) => {
@@ -304,7 +392,7 @@ test("company network failure has a retry action", async ({ page }) => {
   await page.route("**/api/companies/owner/7", (route) => route.abort());
   await page.reload();
   await expect(page.getByRole("alert")).toContainText(
-    "Không thể kết nối máy chủ",
+    "Không thể kết nối API",
   );
   await page.route("**/api/companies/owner/7", (route) =>
     json(route, { data: [company] }),
@@ -318,6 +406,8 @@ test("mobile form fits viewport and remains usable", async ({ page }) => {
   const errors = await setup(page, { session: makeSession() });
   await expect(page.getByLabel("Công ty đăng tuyển")).toHaveValue("12");
   await page.getByLabel("Tiêu đề tuyển dụng").fill("Frontend Developer");
+  await page.getByRole("checkbox", { name: "React", exact: true }).check();
+  await page.getByRole("checkbox", { name: "TypeScript", exact: true }).check();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

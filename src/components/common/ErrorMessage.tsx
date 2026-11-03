@@ -18,7 +18,7 @@ export function ErrorMessage({
       <AlertCircle size={18} aria-hidden="true" />
       <span>{message}</span>
       {retry && (
-        <button className="text-button" onClick={retry}>
+        <button type="button" className="text-button" onClick={retry}>
           <RotateCcw size={14} /> Thử lại
         </button>
       )}

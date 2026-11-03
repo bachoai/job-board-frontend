@@ -6,11 +6,13 @@ import {
   Check,
   Plus,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Field, ErrorMessage } from "../../../components/common/Feedback";
 import { ConfirmAction } from "../../../components/common/ConfirmAction";
+import { useResource } from "../../../components/common/useResource";
+import { JobSkillsField } from "./JobSkillsField";
 
 import { employerApi } from "../api";
 import type { Company, Job } from "../types";
@@ -31,6 +33,9 @@ export function JobForm({
 }) {
   const navigate = useNavigate();
   const [original, setOriginal] = useState(initialJob);
+  const skills = useResource(
+    useCallback((signal: AbortSignal) => employerApi.skills(signal), []),
+  );
   const [form, setForm] = useState<JobFormValues>(() =>
     original
       ? {
@@ -46,6 +51,7 @@ export function JobForm({
           salaryMax:
             original.salaryMax == null ? "" : String(original.salaryMax),
           deadline: original.deadline || "",
+          skillIds: original.skills?.map((skill) => skill.id) || [],
         }
       : {
           ...loadDraft(userId),
@@ -72,7 +78,7 @@ export function JobForm({
   const company = companies.find((c) => c.id === Number(form.companyId));
   const currency = original?.currency || "VND";
 
-  function update(name: keyof JobFormValues, value: string) {
+  function update<K extends keyof JobFormValues>(name: K, value: JobFormValues[K]) {
     const next = { ...form, [name]: value };
     setForm(next);
     setErrors((current) => ({ ...current, [name]: undefined }));
@@ -80,7 +86,7 @@ export function JobForm({
     setSaved(false);
     if (!original) saveDraft(userId, next);
   }
-  function attrs(name: keyof JobFormValues) {
+  function attrs(name: Exclude<keyof JobFormValues, "skillIds">) {
     return {
       id: name,
       name,
@@ -101,9 +107,13 @@ export function JobForm({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending.current) return;
+    if (skills.loading || skills.error) return;
     const next = validateJob(form, original?.deadline);
     if (!companies.some((c) => c.id === Number(form.companyId)))
       next.companyId = "Vui lòng chọn một công ty của bạn.";
+    const availableSkillIds = new Set(skills.data?.map((skill) => skill.id));
+    if (form.skillIds.some((id) => !availableSkillIds.has(id)))
+      next.skillIds = "Một số kỹ năng đã chọn không còn trong danh sách. Vui lòng bỏ chọn các kỹ năng đó.";
     setErrors(next);
     setError("");
     if (Object.keys(next).length) {
@@ -266,6 +276,16 @@ export function JobForm({
                 </select>
               </Field>
             </div>
+            <JobSkillsField
+              skills={skills.data || []}
+              selectedIds={form.skillIds}
+              selectedSkills={original?.skills}
+              loading={skills.loading}
+              loadError={skills.error}
+              error={errors.skillIds}
+              onRetry={skills.reload}
+              onChange={(ids) => update("skillIds", ids)}
+            />
           </section>
           <section className="card">
             <div className="section-title">
@@ -375,7 +395,7 @@ export function JobForm({
               <Link className="secondary" to="/employer/jobs">
                 Về danh sách
               </Link>
-              <button className="primary" disabled={busy || !companies.length}>
+              <button className="primary" disabled={busy || !companies.length || skills.loading || !!skills.error}>
                 {busy
                   ? "Đang đăng tin…"
                   : original
@@ -420,6 +440,17 @@ export function JobForm({
                 : "Chưa xác định hạn nộp"}
             </span>
           </div>
+          {form.skillIds.length > 0 && (
+            <div className="preview-tags" aria-label="Kỹ năng trong bản xem trước">
+              {form.skillIds.map((id) => (
+                <span key={id}>
+                  {skills.data?.find((skill) => skill.id === id)?.name ||
+                    original?.skills?.find((skill) => skill.id === id)?.name ||
+                    `Kỹ năng #${id}`}
+                </span>
+              ))}
+            </div>
+          )}
           <div className="preview-footer">
             {original
               ? "Bản xem trước nội dung chỉnh sửa"

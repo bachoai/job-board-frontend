@@ -842,6 +842,90 @@ td strong {
   font-size: 11px;
   color: var(--danger);
 }
+.job-skills-field {
+  min-width: 0;
+  margin: 22px 0 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.job-skills-field legend {
+  padding: 0 6px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 650;
+}
+.job-skills-selected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.job-skill-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 7px 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 7px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.job-skill-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 10px;
+  color: #94a3b8;
+}
+.job-skill-search input {
+  min-width: 0;
+  flex: 1;
+}
+.job-skill-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+  gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 3px;
+}
+.job-skill-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.job-skill-option:has(input:checked) {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+.job-skill-option input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
+  flex: 0 0 16px;
+  margin: 0;
+  accent-color: #2563eb;
+}
+.job-skill-option span {
+  overflow-wrap: anywhere;
+}
+.job-skill-count {
+  margin-top: 12px;
+}
+.job-skills-field .field-error {
+  margin-top: 8px;
+}
 .two-cols {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

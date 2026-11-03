@@ -9,14 +9,21 @@ export function loadDraft(userId: number): JobForm {
       sessionStorage.getItem(key(userId)) || "null",
     );
     if (!saved || typeof saved !== "object") return { ...emptyForm };
-    return Object.fromEntries(
-      Object.entries(emptyForm).map(([name, fallback]) => [
-        name,
-        name in saved && typeof saved[name as keyof typeof saved] === "string"
-          ? saved[name as keyof typeof saved]
-          : fallback,
-      ]),
-    ) as unknown as JobForm;
+    const { skillIds: _, ...textFields } = emptyForm;
+    const ids = "skillIds" in saved ? saved.skillIds : [];
+    return {
+      ...Object.fromEntries(
+        Object.entries(textFields).map(([name, fallback]) => [
+          name,
+          name in saved && typeof saved[name as keyof typeof saved] === "string"
+            ? saved[name as keyof typeof saved]
+            : fallback,
+        ]),
+      ),
+      skillIds: Array.isArray(ids)
+        ? [...new Set(ids.filter((id): id is number => Number.isSafeInteger(id) && id > 0))]
+        : [],
+    } as JobForm;
   } catch {
     return { ...emptyForm };
   }

@@ -21,6 +21,7 @@ export interface JobForm {
   salaryMin: string;
   salaryMax: string;
   deadline: string;
+  skillIds: number[];
 }
 export const emptyForm: JobForm = {
   companyId: "",
@@ -33,6 +34,7 @@ export const emptyForm: JobForm = {
   salaryMin: "",
   salaryMax: "",
   deadline: "",
+  skillIds: [],
 };
 export function today() {
   const now = new Date();
@@ -60,6 +62,12 @@ export function validateJob(
     errors.jobType = "Hình thức làm việc không hợp lệ.";
   if (form.level && !Object.hasOwn(jobLevels, form.level))
     errors.level = "Cấp bậc không hợp lệ.";
+  if (
+    !Array.isArray(form.skillIds) ||
+    form.skillIds.some((id) => !Number.isSafeInteger(id) || id < 1) ||
+    new Set(form.skillIds).size !== form.skillIds.length
+  )
+    errors.skillIds = "Vui lòng chọn các kỹ năng hợp lệ, không trùng nhau.";
   for (const key of ["salaryMin", "salaryMax"] as const) {
     if (
       form[key] !== "" &&
@@ -90,6 +98,7 @@ export function jobPayload(form: JobForm) {
     title: form.title.trim(),
     jobType: form.jobType,
     currency: "VND",
+    skillIds: [...form.skillIds],
     ...(form.description.trim()
       ? { description: form.description.trim() }
       : {}),
