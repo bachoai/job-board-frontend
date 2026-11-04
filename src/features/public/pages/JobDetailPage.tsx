@@ -7,13 +7,14 @@ import { ErrorMessage, Loading } from "../../../components/common/Feedback";
 import { StatusBadge } from "../../../components/common/StatusBadge";
 import { useResource } from "../../../components/common/useResource";
 import { publicApi, isOpenJob } from "../api/public.api";
+import type { JobWithCompany } from "../api/public.api";
 import { salaryLabel, typeLabel, levelLabel } from "./JobCard";
 import { ApplyDialog } from "../../candidate/components/ApplyDialog";
 export function JobDetailPage() {
   const { id } = useParams(); const jobId = routeId(id);
   const { session } = useAuth(); const location = useLocation();
   const [apply, setApply] = useState(false);
-  const job = useResource(useCallback((signal: AbortSignal) => jobId ? publicApi.job(jobId, signal) : Promise.reject(new Error("Mã tin không hợp lệ.")), [jobId]));
+  const job = useResource<JobWithCompany>(useCallback((signal: AbortSignal) => jobId ? publicApi.job(jobId, signal) : Promise.reject(new Error("Mã tin không hợp lệ.")), [jobId]));
   useEffect(() => { setApply(false); }, [jobId]);
   if (job.loading) return <main className="public-page public-section"><Loading/></main>;
   if (job.error || !job.data) return <main className="public-page public-section"><ErrorMessage message={job.error || "Không tìm thấy tin tuyển dụng."} retry={job.reload}/><Link to="/jobs" className="public-back"><ArrowLeft size={16}/> Danh sách việc làm</Link></main>;

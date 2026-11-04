@@ -15,6 +15,7 @@ export function DataTable<T extends { id: number }>({
   searchLabel = "Tìm kiếm",
   filters,
   filtered = false,
+  filterKey = "",
   title = "Danh sách",
   loading = false,
   emptyTitle = "Chưa có dữ liệu",
@@ -25,20 +26,23 @@ export function DataTable<T extends { id: number }>({
   searchLabel?: string;
   filters?: ReactNode;
   filtered?: boolean;
+  filterKey?: string;
   title?: string;
   loading?: boolean;
   emptyTitle?: string;
 }) {
   const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, filterKey });
   const [pageSize, setPageSize] = useState(10);
+  if (pagination.filterKey !== filterKey) setPagination({ page: 1, filterKey });
+  function setPage(page: number) { setPagination({ page, filterKey }); }
   const matched = rows.filter((row) =>
     searchText(row)
       .toLocaleLowerCase("vi")
       .includes(query.trim().toLocaleLowerCase("vi")),
   );
   const pages = Math.max(1, Math.ceil(matched.length / pageSize));
-  const current = Math.min(page, pages);
+  const current = Math.min(pagination.filterKey === filterKey ? pagination.page : 1, pages);
   const visible = matched.slice((current - 1) * pageSize, current * pageSize);
   return (
     <div className="table-card">

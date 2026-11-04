@@ -1,4 +1,4 @@
-import { api, apiBlob } from "../../../lib/api";
+import { api, apiBlob, ApiError, getSession } from "../../../lib/api";
 import type { Application, ApplicationHistory, Resume, User } from "../../employer/types";
 
 export type CandidateResume = Resume & { isDefault: boolean; uploadedAt: string };
@@ -11,7 +11,13 @@ export const candidateApi = {
   me: (signal?: AbortSignal) => api<User>("/users/me", { signal }),
   updateMe: (id: number, body: { fullName: string; phone: string | null }) =>
     api<User>(`/users/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
-  resumes: (signal?: AbortSignal) => api<CandidateResume[]>("/resumes/users/me", { signal }),
+  async resumes(signal?: AbortSignal) {
+    const ownerId = getSession()?.user.id;
+    if (!ownerId) throw new ApiError("Vui lòng đăng nhập để quản lý CV.", 401);
+    // AI2 exposes GET /resumes. Restrict the UI too; server AI endpoints still check ownership.
+    const resumes = await api<CandidateResume[]>("/resumes", { signal });
+    return resumes.filter((resume) => resume.userId === ownerId);
+  },
   upload(file: File, isDefault: boolean) {
     const body = new FormData();
     body.append("file", file);

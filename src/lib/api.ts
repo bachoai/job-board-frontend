@@ -50,11 +50,12 @@ const expiredMessage =
   "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
 let refreshing: Promise<Session> | null = null;
 
-type ApiOptions = RequestInit & { auth?: boolean };
+type RequestOptions = RequestInit & { timeoutMs?: number };
+type ApiOptions = RequestOptions & { auth?: boolean };
 
 async function request<T>(
   path: string,
-  options: RequestInit,
+  options: RequestOptions,
   token?: string,
 ): Promise<T> {
   const headers = new Headers(options.headers);
@@ -70,6 +71,7 @@ async function request<T>(
       data: options.body,
       headers: Object.fromEntries(headers.entries()),
       signal: options.signal || undefined,
+      timeout: options.timeoutMs,
     });
   } catch (err) {
     if (options.signal?.aborted) throw err;

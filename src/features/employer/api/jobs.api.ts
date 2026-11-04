@@ -8,10 +8,11 @@ export const jobsApi = {
       method: "POST",
       body: JSON.stringify(jobPayload(form)),
     }),
-  // Backend gốc có GET /jobs/mine trả về tin của chính chủ tài khoản.
-  // Không cần tải tất cả tin rồi lọc tại frontend.
-  myJobs: (_ownerId: number, signal?: AbortSignal) =>
-    api<Job[]>("/jobs/mine", { signal }),
+  // AI2 exposes GET /jobs with Bearer authentication, but no /jobs/mine.
+  async myJobs(ownerId: number, signal?: AbortSignal): Promise<Job[]> {
+    const jobs = await api<Job[]>("/jobs", { signal });
+    return jobs.filter(job => job.createdBy === ownerId);
+  },
   job: (id: number, signal?: AbortSignal) =>
     api<Job>(`/jobs/${id}`, { signal }),
   updateJob(id: number, form: JobForm, original: Job) {

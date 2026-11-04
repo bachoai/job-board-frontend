@@ -88,8 +88,9 @@ async function setup(page: Page, path: string, role = "employer") {
     if (path === "/api/companies/owner/7")
       return json(route, { data: [company] });
     if (path === "/api/companies") return json(route, [company]);
-    if (path === "/api/jobs/mine") return json(route, [job]);
+    if (path === "/api/jobs/mine") return json(route, { message: "Validation failed (numeric string is expected)" }, 400);
     if (path === "/api/skills") return json(route, [{ id: 17, name: "React" }, { id: 88, name: "NestJS" }]);
+    if (path === "/api/ai/jobs/20/applicants") return json(route, { jobId: 20, count: 0, items: [] });
     if (path === "/api/jobs")
       return json(route, [
         job,
@@ -279,7 +280,7 @@ test("B5 filters applicants by status and opens B6 detail with CV", async ({
   await expect(page.getByText("Không có kết quả phù hợp")).toBeVisible();
   await page.getByLabel("Lọc trạng thái hồ sơ").selectOption("new");
   await page.getByRole("link", { name: "Xem hồ sơ →" }).click();
-  await expect(page).toHaveURL(/\/employer\/applications\/30$/);
+  await expect(page).toHaveURL(/\/employer\/applications\/30\?jobId=20$/);
   await expect(page.getByText(application.coverLetter)).toBeVisible();
   await expect(page.getByRole("button", { name: "Tải CV" })).toBeEnabled();
 });

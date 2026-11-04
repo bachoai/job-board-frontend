@@ -1,36 +1,19 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import test from 'node:test';
-import vm from 'node:vm';
-const require = createRequire(import.meta.url);
-const ts = require('typescript');
-const source = readFileSync(new URL('../src/features/public/api/public.api.ts', import.meta.url), 'utf8');
+import { loadApi } from './helpers/load-api.mjs';
 
 function makeApi(responses) {
   const calls = [];
-  const js = ts.transpileModule(source, {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-    reportDiagnostics: true,
-  });
-  assert.equal((js.diagnostics || []).length, 0);
-  const exports = {};
-  const context = {
-    exports,
-    URLSearchParams,
-    require: (name) => {
-      if (name.endsWith('/lib/api')) return {
+  const exports = loadApi('../../src/features/public/api/public.api.ts', {
+      '/lib/api': {
         api: (path, options) => {
           calls.push({ path, options });
           const value = responses[path];
           return value instanceof Error ? Promise.reject(value) : Promise.resolve(value);
         },
-      };
-      if (name.endsWith('/utils/open-job')) return { isOpenJob: () => true };
-      throw new Error(`Unknown import: ${name}`);
-    },
-  };
-  vm.runInNewContext(js.outputText, context);
+      },
+      '/utils/open-job': { isOpenJob: () => true },
+  });
   return { api: exports.publicApi, calls };
 }
 
@@ -38,16 +21,14 @@ test('all public endpoints use real backend, without demo data or alternative st
   const { api, calls } = makeApi({
     '/jobs?page=1&limit=9&province=H%C3%A0+N%E1%BB%99i&level=intern': { items: [], meta: { page: 1, limit: 9, total: 0, totalPages: 0 } },
     '/jobs/11': { id: 11, companyId: 4 },
-    '/search/jobs?q=SQL&limit=50': { count: 0, items: [] },
     '/companies': [{ id: 4, name: 'Company from DB' }],
     '/companies/4': { id: 4, name: 'Company from DB' },
   });
   await api.jobs({ page: 1, limit: 9, province: 'Hà Nội', level: 'intern' });
   assert.equal((await api.job(11)).id, 11);
-  assert.equal((await api.search('SQL')).count, 0);
   assert.equal((await api.companies())[0].name, 'Company from DB');
   assert.equal((await api.company(4)).name, 'Company from DB');
-  assert.equal(calls.length, 5);
+  assert.equal(calls.length, 4);
   assert.ok(calls.every(call => call.options.auth === false));
 });
 
@@ -66,4 +47,23 @@ test('HTTP failures propagate to UI and do not fall back to fabricated data', as
   const { api } = makeApi({ '/jobs?page=1&limit=9': error, '/companies': error });
   await assert.rejects(() => api.jobs({ page: 1, limit: 9 }), /HTTP 500/);
   await assert.rejects(() => api.companies(), /HTTP 500/);
+});
+
+test('AI2 array responses are filtered and paginated, including empty arrays', async () => {
+  const rows = Array.from({ length: 12 }, (_, index) => ({ id: index + 1, companyId: 4, title: 'Backend', province: 'Hà Nội', level: 'junior', status: 'open', deadline: null }));
+  const path = '/jobs?page=2&limit=9&province=H%C3%A0+N%E1%BB%99i&level=junior';
+  const { api } = makeApi({
+    [path]: [...rows, { ...rows[0], id: 99, province: 'Đà Nẵng' }, { ...rows[0], id: 100, level: 'senior' }],
+    '/jobs?page=1&limit=9': [],
+    '/jobs?page=1&limit=100&companyName=ABC': rows,
+    '/companies': [{ id: 4, name: 'ABC' }],
+  });
+  const page = await api.jobs({ page: 2, limit: 9, province: 'Hà Nội', level: 'junior' });
+  assert.deepEqual(Array.from(page.items, job => job.id), [10, 11, 12]);
+  assert.equal(page.meta.total, 12);
+  assert.equal(page.meta.totalPages, 2);
+  const empty = await api.jobs({ page: 1, limit: 9 });
+  assert.equal(empty.items.length, 0);
+  assert.equal(empty.meta.total, 0);
+  assert.equal((await api.companyJobs(4, 'ABC')).length, 12);
 });

@@ -162,7 +162,7 @@ export function ApplicationsPage({ userId }: { userId: number }) {
                   render: (row) => (
                     <Link
                       className="table-link"
-                      to={`/employer/applications/${row.id}`}
+                      to={`/employer/applications/${row.id}?jobId=${row.jobId}`}
                     >
                       Xem hồ sơ →
                     </Link>

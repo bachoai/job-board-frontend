@@ -2,7 +2,7 @@ import { apiBlob } from "../../../lib/api";
 import { applicationStatuses } from "../../../components/common/statuses";
 import { formatDate, routeId } from "../../../components/common/format";
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ApplicationStatusForm as StatusPanel } from "../components/ApplicationStatusForm";
 import {
   EmptyState,
@@ -13,6 +13,9 @@ import {
 import { StatusBadge } from "../../../components/common/StatusBadge";
 import { useResource } from "../../../components/common/useResource";
 import { employerApi } from "../api";
+import { ApiError } from "../../../lib/api";
+import { AI_ENABLED } from "../../ai/config";
+import { AiApplicationPanel } from "../../ai/components/AiApplicationPanel";
 
 // Backend serves CV only through authenticated GET /resumes/:id/file.
 // The previous public /uploads/ link and GET /resumes/:id do not exist.
@@ -98,12 +101,18 @@ function HistoryPanel({ id }: { id: number }) {
 }
 export function ApplicationDetailPage({ userId }: { userId: number }) {
   const id = routeId(useParams().id);
+  const [searchParams] = useSearchParams();
+  const contextJobId = routeId(searchParams.get("jobId") || undefined);
   const [historyVersion, setHistoryVersion] = useState(0);
   const resource = useResource(
     useCallback(
       async (signal: AbortSignal) => {
         if (!id) throw new Error("Mã hồ sơ không hợp lệ.");
-        const application = await employerApi.application(id, signal);
+        const application = await employerApi.application(id, signal).catch((error: unknown) => {
+          if (error instanceof ApiError && error.status === 403)
+            throw new Error("Hệ thống hiện chưa cấp quyền cho nhà tuyển dụng xem chi tiết hồ sơ này. Đánh giá AI vẫn có thể xem từ danh sách ứng viên được cấp quyền.");
+          throw error;
+        });
         const job = await employerApi.job(application.jobId, signal);
         return { application, job };
       },
@@ -127,7 +136,7 @@ export function ApplicationDetailPage({ userId }: { userId: number }) {
             to={
               resource.data
                 ? `/employer/jobs/${resource.data.job.id}/applications`
-                : "/employer/jobs"
+                : contextJobId ? `/employer/jobs/${contextJobId}/applications` : "/employer/jobs"
             }
           >
             ← Danh sách hồ sơ
@@ -186,6 +195,8 @@ export function ApplicationDetailPage({ userId }: { userId: number }) {
           </div>
         )
       )}
+      {AI_ENABLED && id && (resource.data?.job.id || contextJobId) && <AiApplicationPanel key={`${id}:${resource.data?.job.id || contextJobId}`} applicationId={id} jobId={(resource.data?.job.id || contextJobId)!}/>}
+      {AI_ENABLED && id && resource.error && !contextJobId && <section className="card"><h2>Đánh giá AI</h2><p className="ai-note">Mở hồ sơ từ danh sách ứng viên của tin tuyển dụng để xem đánh giá AI được cấp quyền.</p><Link className="secondary" to="/employer/jobs">Về tin của tôi</Link></section>}
     </main>
   );
 }

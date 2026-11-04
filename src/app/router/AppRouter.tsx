@@ -13,6 +13,8 @@ import { CompaniesPage as PublicCompaniesPage } from "../../features/public/page
 import { CompanyDetailPage } from "../../features/public/pages/CompanyDetailPage";
 import { ProfilePage } from "../../features/candidate/pages/ProfilePage";
 import { ResumesPage } from "../../features/candidate/pages/ResumesPage";
+import { RecommendedJobsPage } from "../../features/candidate/pages/RecommendedJobsPage";
+import { AI_ENABLED } from "../../features/ai/config";
 import { ApplicationsPage as CandidateApplicationsPage } from "../../features/candidate/pages/ApplicationsPage";
 import { ApplicationDetailPage as CandidateApplicationDetailPage } from "../../features/candidate/pages/ApplicationDetailPage";
 import { CreateJobPage } from "../../features/employer/pages/CreateJobPage";
@@ -42,6 +44,7 @@ function RoleRoutes() {
       <Route path="/me" element={<ProtectedRoute role="candidate"><CandidateLayout/></ProtectedRoute>}>
         <Route index element={<ProfilePage/>}/>
         <Route path="resumes" element={<ResumesPage/>}/>
+        {AI_ENABLED && <Route path="recommended-jobs" element={<RecommendedJobsPage/>}/>}
         <Route path="applications" element={<CandidateApplicationsPage/>}/>
         <Route path="applications/:id" element={<CandidateApplicationDetailPage/>}/>
       </Route>

@@ -1,5 +1,6 @@
 import { api } from "../../../lib/api";
 import type { Company, Job } from "../../employer/types";
+import { isOpenJob } from "../utils/open-job";
 
 /** Public pages always read data from NestJS; no mock/demo fallback. */
 export type JobWithCompany = Job & {
@@ -17,14 +18,6 @@ export interface JobFilters {
   level?: string;
   companyName?: string;
 }
-export interface JobSearchHit {
-  id: number;
-  title: string;
-  level: string | null;
-  province: string | null;
-  location: string | null;
-  score: number;
-}
 const params = (input: Record<string, string | number | undefined>) => {
   const values = new URLSearchParams();
   Object.entries(input).forEach(([key, value]) => {
@@ -34,16 +27,26 @@ const params = (input: Record<string, string | number | undefined>) => {
 };
 
 export const publicApi = {
-  jobs(filters: JobFilters, signal?: AbortSignal): Promise<JobPage> {
-    return api<JobPage>(`/jobs?${params({ page: filters.page, limit: filters.limit, province: filters.province, level: filters.level, companyName: filters.companyName })}`, { auth: false, signal });
+  async jobs(filters: JobFilters, signal?: AbortSignal): Promise<JobPage> {
+    const result = await api<JobPage | JobWithCompany[]>(`/jobs?${params({ page: filters.page, limit: filters.limit, province: filters.province, level: filters.level, companyName: filters.companyName })}`, { auth: false, signal });
+    if (!Array.isArray(result)) return result;
+    // AI2 returns the complete array and ignores pagination/location/level queries.
+    const companyName = filters.companyName?.trim().toLocaleLowerCase("vi");
+    const companies = companyName ? await this.companies(signal) : [];
+    const companyIds = new Set(companies.filter(company => company.name.toLocaleLowerCase("vi").includes(companyName!)).map(company => company.id));
+    const matched = result.filter(job => isOpenJob(job)
+      && (!filters.province || job.province?.toLocaleLowerCase("vi") === filters.province.toLocaleLowerCase("vi"))
+      && (!filters.level || job.level === filters.level)
+      && (!companyName || companyIds.has(job.companyId) || job.company?.name.toLocaleLowerCase("vi").includes(companyName)));
+    return {
+      items: matched.slice((filters.page - 1) * filters.limit, filters.page * filters.limit),
+      meta: { page: filters.page, limit: filters.limit, total: matched.length, totalPages: Math.ceil(matched.length / filters.limit) },
+    };
   },
   job(id: number, signal?: AbortSignal): Promise<JobWithCompany> {
     return api<JobWithCompany>(`/jobs/${id}`, { auth: false, signal });
   },
-  search(query: string, signal?: AbortSignal): Promise<{ items: JobSearchHit[]; count: number }> {
-    return api<{ items: JobSearchHit[]; count: number }>(`/search/jobs?${params({ q: query, limit: 50 })}`, { auth: false, signal });
-  },
-  /** If full-text search is unavailable, search ONLY jobs returned by the real API. */
+  /** Basic keyword search uses ONLY jobs returned by the real public API. */
   async basicSearch(query: string, signal?: AbortSignal): Promise<JobWithCompany[]> {
     const term = query.trim().toLocaleLowerCase("vi");
     if (!term) return [];

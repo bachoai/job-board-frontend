@@ -14,11 +14,18 @@ Cấu hình API:
 
 ```dotenv
 VITE_API_BASE_URL=http://localhost:3000/api
+VITE_AI_ENABLED=true
 ```
 
 `VITE_API_URL` cũ vẫn hoạt động nếu chưa đặt `VITE_API_BASE_URL`. Base URL bao gồm `/api` đúng một lần; các API feature chỉ dùng đường dẫn như `/jobs`.
 
 Chạy backend riêng, mở `/login` hoặc một trang cần dùng và đăng nhập bằng tài khoản employer/admin đã có. Bản production không có dữ liệu demo hoặc tài khoản mặc định.
+
+## Chức năng AI
+
+Đã tích hợp tìm kiếm việc làm bằng câu tự nhiên, phân tích CV, gợi ý việc làm tại `/me/recommended-jobs`, xếp hạng ứng viên và chấm lại đơn ứng tuyển. Bật/tắt giao diện bằng `VITE_AI_ENABLED`; backend phải bật module AI và có Ollama, RabbitMQ, pgvector cùng dữ liệu embeddings.
+
+Xem [tài liệu tích hợp AI](docs/ai-integration.md) để biết ánh xạ màn hình/API, tệp thay đổi, kết quả kiểm thử và các lỗi quyền/schema cần backend hoàn thiện. AI đã được bật trong môi trường local với Ollama `bge-m3`; health và tìm kiếm hybrid trả 200. Các môi trường khác cần cấu hình và khởi tạo schema riêng.
 
 ## Thay đổi giao diện và cấu trúc
 
@@ -30,7 +37,7 @@ Chạy backend riêng, mở `/login` hoặc một trang cần dùng và đăng n
 - Form đăng/sửa tin tải danh sách kỹ năng từ `GET /api/skills` có xác thực, cho tìm kiếm và chọn nhiều kỹ năng, lưu lựa chọn trong bản nháp và gửi `skillIds: number[]`. Khi sửa tin, kỹ năng cũ được chọn sẵn; bỏ hết gửi `skillIds: []`. Lỗi tải danh sách có nút thử lại và giữ nội dung form.
 - Xác nhận thao tác, loading, empty/error/success states được dùng chung trên mọi trang.
 - Giữ React + TypeScript + Vite, React Router và CSS của dự án. Thêm Lucide React và dùng Axios đã có sẵn. Giữ logic validation đang hoạt động, không chuyển toàn bộ form sang thư viện khác chỉ để thay giao diện. TypeScript đã bật `strict`.
-- Không tạo trang Public/Candidate hoặc hệ thống Auth mới. Màn hình đăng nhập độc lập đã có ở bản trước được giữ lại và logic của nó được tách vào provider để thuận tiện ghép với phần A.
+- Giữ các trang Public/Candidate và Auth đã ghép trong dự án; các chức năng AI được gắn vào luồng hiện có.
 
 ```text
 src/
@@ -98,7 +105,7 @@ src/
 
 `Feedback.tsx`, `ConfirmAction.tsx` và `JobEditor.tsx` giữ các export tương thích với mã cũ; phần triển khai hiện nằm trong các component có tên rõ ràng. `App.tsx` chỉ gắn provider/router và CSS. Khi ghép phần A, dùng AuthProvider/guard của nhóm hoặc đồng bộ về cùng `jobboard.session`; không cần sửa từng page.
 
-Mọi thao tác lỗi đều hiển thị thông báo API; không giả báo thành công. Tin bị chặn không sửa được, hồ sơ đã từ chối không đổi lại được, ngày nộp mới không được nằm trong quá khứ. Các trạng thái theo enum backend; giá trị lạ dùng badge trung tính. Không có tính năng AI.
+Mọi thao tác lỗi đều hiển thị thông báo API; không giả báo thành công. Tin bị chặn không sửa được, hồ sơ đã từ chối không đổi lại được, ngày nộp mới không được nằm trong quá khứ. Các trạng thái theo enum backend; giá trị lạ dùng badge trung tính. AI không tự thay đổi trạng thái đơn ứng tuyển.
 
 ## Backend hiện tại và các giới hạn giữ nguyên
 
@@ -107,7 +114,7 @@ Mọi thao tác lỗi đều hiển thị thông báo API; không giả báo th�
 - **Email:** cập nhật hồ sơ hiện chỉ ghi dữ liệu và lịch sử; chưa gửi email tự động. Giao diện không hứa email đã được gửi.
 - **Tin của tôi:** chưa có `/jobs/mine`; dùng `/jobs` có Bearer token rồi lọc `createdBy`. Backend cho employer/admin xem mọi trạng thái khi token hợp lệ. Số hồ sơ lấy qua `/applications?jobId=...`, tối đa 4 yêu cầu đồng thời; khi chưa tải được hiển thị `—`.
 - **Ứng viên:** response hồ sơ chỉ có `candidateId`; hiển thị mã ứng viên thay vì bịa họ tên/email hoặc gọi API người dùng mà employer không có quyền.
-- **CV:** dùng `/resumes/:id` và `fileUrl` dưới `/uploads/` của cùng máy chủ backend. PDF có vùng xem, Word có liên kết mở/tải. Không mở URL giao thức lạ hoặc máy chủ ngoài.
+- **CV:** xem/tải qua `GET /resumes/:id/file` có Bearer token. Không dùng URL tĩnh để vượt quyền. Backend AI2 hiện giới hạn chủ CV/admin; xem các vấn đề quyền và lọc CV trong tài liệu AI.
 - **Phiên:** Axios chung tại `lib/axios.ts`; `lib/api.ts` giữ Bearer token, gia hạn, timeout, hủy request và lỗi tiếng Việt. Do `/auth/refresh` cũng cần access token hợp lệ, gia hạn khi token còn dưới 60 giây; nếu đã hết hạn thì đăng nhập lại. Bản nháp tin mới được giữ trong tab theo tài khoản và xóa sau khi tạo thành công.
 - **Sửa tin:** không đổi companyId, giữ currency, gửi null để xóa trường nullable. Không gửi lại hạn cũ không đổi, nên vẫn sửa được tin đã hết hạn. Các lần lưu liên tiếp dùng dữ liệu vừa lưu làm gốc.
 
@@ -117,6 +124,10 @@ Mọi thao tác lỗi đều hiển thị thông báo API; không giả báo th�
 npm run build
 npm run lint
 npm test
+npm run test:a
+npm run test:errors
+npm run test:ai
+npm run test:api
 npm run test:e2e
 ```
 

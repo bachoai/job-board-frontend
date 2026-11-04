@@ -11,9 +11,13 @@ import {
 import { StatusBadge } from "../../../components/common/StatusBadge";
 import { useResource } from "../../../components/common/useResource";
 import { employerApi } from "../api";
+import { Sparkles } from "lucide-react";
+import { AI_ENABLED } from "../../ai/config";
+import { AiApplicantsTable } from "../../ai/components/AiApplicantsTable";
 export function JobApplicationsPage() {
   const id = routeId(useParams().id);
   const [status, setStatus] = useState("");
+  const [showAi, setShowAi] = useState(false);
   const resource = useResource(
     useCallback(
       async (signal: AbortSignal) => {
@@ -41,7 +45,11 @@ export function JobApplicationsPage() {
           </Link>
         }
       />
-      {resource.loading ? (
+      {AI_ENABLED && id && <section className="ai-mode" aria-label="Đánh giá ứng viên bằng AI">
+        <strong><Sparkles size={17}/> Đánh giá ứng viên bằng AI</strong>
+        <div className="row-actions"><button className="secondary" aria-pressed={!showAi} onClick={() => setShowAi(false)}>Danh sách thông thường</button><button className="secondary" aria-pressed={showAi} onClick={() => setShowAi(true)}>Xếp hạng ứng viên theo AI</button></div>
+      </section>}
+      {AI_ENABLED && showAi && id ? <AiApplicantsTable key={id} jobId={id}/> : resource.loading ? (
         <Loading />
       ) : resource.error ? (
         <ErrorMessage message={resource.error} retry={resource.reload} />
@@ -110,7 +118,7 @@ export function JobApplicationsPage() {
                   render: (item) => (
                     <Link
                       className="table-link"
-                      to={`/employer/applications/${item.id}`}
+                      to={`/employer/applications/${item.id}?jobId=${id}`}
                     >
                       Xem hồ sơ →
                     </Link>

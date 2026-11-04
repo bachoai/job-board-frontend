@@ -1,0 +1,55 @@
+.ai-heading, .ai-actions, .ai-mode, .ai-search-toggle { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ai-heading { justify-content: space-between; margin-bottom: 16px; }
+.ai-heading h2, .ai-application-panel > h2 { display: flex; gap: 8px; align-items: center; }
+.ai-heading svg, .ai-application-panel > h2 svg { color: var(--primary); }
+.ai-actions { margin: 16px 0; }
+.ai-actions .primary, .ai-actions .secondary { display: inline-flex; align-items: center; gap: 8px; }
+.ai-panel { padding: 20px; margin-top: 18px; border: 1px solid var(--border); border-radius: var(--radius); background: #f8fbff; min-width: 0; }
+.ai-note { margin: 14px 0; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.ai-notice { padding: 18px; margin: 16px 0; border: 1px solid #bfdbfe; border-radius: var(--radius); background: #eff6ff; }
+.ai-notice > p { margin-top: 8px; }
+.ai-skills { margin: 16px 0; min-width: 0; }
+.ai-skills h3 { font-size: 12px; margin-bottom: 8px; }
+.ai-skills ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.ai-skills li { padding: 4px 9px; background: #eff6ff; color: #1d4ed8; border: 1px solid #dbeafe; border-radius: 6px; font-size: 12px; overflow-wrap: anywhere; }
+.ai-skills-matched li { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
+.ai-skills-missing li { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+.ai-score-badge { display: inline-flex; padding: 5px 9px; border-radius: 6px; font-size: 11px; font-weight: 650; white-space: normal; }
+.ai-tone-suitable { background: #f0fdf4; color: #166534; }
+.ai-tone-review { background: #fffbeb; color: #92400e; }
+.ai-tone-unsuitable { background: #fff1f2; color: #9f1239; }
+.ai-tone-neutral { background: #f1f5f9; color: #475569; }
+.ai-score-bar { min-width: 110px; margin: 16px 0; }
+.ai-score-bar > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; margin-bottom: 7px; }
+.ai-score-bar strong { color: var(--primary); white-space: nowrap; flex-shrink: 0; }
+.ai-progress { height: 7px; background: #e2e8f0; border-radius: 10px; overflow: hidden; }
+.ai-progress > span { display: block; background: var(--primary); height: 100%; border-radius: inherit; }
+.ai-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 20px 0; }
+.ai-facts div { min-width: 0; }
+.ai-facts dt { color: var(--muted); font-size: 11px; }
+.ai-facts dd { margin: 4px 0 0; font-size: 13px; overflow-wrap: anywhere; }
+.ai-match-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 18px; }
+.ai-match-card { min-width: 0; }
+.ai-match-card > .secondary { display: inline-flex; margin-top: auto; align-self: flex-start; }
+.ai-resume-select label { display: block; margin-bottom: 8px; }
+.ai-application-panel { margin-top: 22px; }
+.ai-skills-details { min-width: 180px; max-width: 300px; }
+.ai-skills-details summary { color: var(--primary); cursor: pointer; }
+.ai-mode { padding: 18px; margin-bottom: 20px; border: 1px solid var(--border); border-radius: var(--radius); background: white; }
+.ai-search-toggle { color: #1d4ed8; font-size: 13px; cursor: pointer; }
+.ai-search-toggle input { width: 17px; height: 17px; min-height: 17px; margin: 0; accent-color: var(--primary); }
+.ai-search-label { display: inline-flex; align-items: center; gap: 7px; margin: 0 0 18px; padding: 7px 11px; border: 1px solid #bfdbfe; border-radius: 7px; background: #eff6ff; color: #1d4ed8; font-size: 12px; }
+.candidate-resume-item.ai-resume-item { flex-wrap: wrap; }
+.ai-resume-item > .ai-panel { flex: 0 0 100%; }
+@media (max-width: 640px) {
+  .ai-panel { padding: 15px; }
+  .ai-facts { grid-template-columns: 1fr; }
+  .ai-actions { align-items: stretch; }
+  .ai-actions > button { white-space: normal; }
+  .ai-match-grid { grid-template-columns: minmax(0, 1fr); }
+}
+.ai-candidate-layout .candidate-side-link svg { flex-shrink: 0; }
+@media (max-width: 600px) {
+  .ai-candidate-layout .candidate-side nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; }
+  .ai-candidate-layout .candidate-side-link { min-width: 0; gap: 7px; }
+}
