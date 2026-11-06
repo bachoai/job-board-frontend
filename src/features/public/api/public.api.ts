@@ -29,7 +29,11 @@ const params = (input: Record<string, string | number | undefined>) => {
 export const publicApi = {
   async jobs(filters: JobFilters, signal?: AbortSignal): Promise<JobPage> {
     const result = await api<JobPage | JobWithCompany[]>(`/jobs?${params({ page: filters.page, limit: filters.limit, province: filters.province, level: filters.level, companyName: filters.companyName })}`, { auth: false, signal });
-    if (!Array.isArray(result)) return result;
+    if (!Array.isArray(result)) {
+      if (!Array.isArray(result?.items) || !result.meta || !Number.isFinite(result.meta.total) || !Number.isFinite(result.meta.totalPages))
+        throw new Error("Dữ liệu danh sách việc làm từ máy chủ không hợp lệ. Vui lòng thử lại.");
+      return result;
+    }
     // AI2 returns the complete array and ignores pagination/location/level queries.
     const companyName = filters.companyName?.trim().toLocaleLowerCase("vi");
     const companies = companyName ? await this.companies(signal) : [];

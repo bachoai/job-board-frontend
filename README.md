@@ -120,6 +120,8 @@ Mọi thao tác lỗi đều hiển thị thông báo API; không giả báo th�
 
 ## Kiểm tra
 
+Xem [báo cáo rà soát toàn dự án](docs/project-audit.md) để biết các lỗi backend còn chặn nghiệp vụ, phân quyền CV và kết quả kiểm thử thực tế. `npm run check:contract` đối chiếu các route cần thiết với Swagger; hiện báo thiếu 3 API trên nhánh AI2.
+
 ```powershell
 npm run build
 npm run lint

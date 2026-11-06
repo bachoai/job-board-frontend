@@ -35,7 +35,7 @@ test('all public endpoints use real backend, without demo data or alternative st
 test('company jobs come from paginated backend and match companyId', async () => {
   const path = '/jobs?page=1&limit=100&companyName=ABC';
   const { api, calls } = makeApi({
-    [path]: { items: [{ id: 1, companyId: 4 }, { id: 2, companyId: 5 }], meta: { page: 1, limit: 100, totalPages: 1 } },
+    [path]: { items: [{ id: 1, companyId: 4 }, { id: 2, companyId: 5 }], meta: { page: 1, limit: 100, total: 2, totalPages: 1 } },
   });
   const jobs = await api.companyJobs(4, 'ABC');
   assert.deepEqual(Array.from(jobs, job => job.id), [1]);
@@ -47,6 +47,11 @@ test('HTTP failures propagate to UI and do not fall back to fabricated data', as
   const { api } = makeApi({ '/jobs?page=1&limit=9': error, '/companies': error });
   await assert.rejects(() => api.jobs({ page: 1, limit: 9 }), /HTTP 500/);
   await assert.rejects(() => api.companies(), /HTTP 500/);
+});
+
+test('invalid job pagination becomes a recoverable API error instead of a render crash', async () => {
+  const { api } = makeApi({ '/jobs?page=1&limit=9': { items: [] } });
+  await assert.rejects(() => api.jobs({ page: 1, limit: 9 }), /không hợp lệ/);
 });
 
 test('AI2 array responses are filtered and paginated, including empty arrays', async () => {
