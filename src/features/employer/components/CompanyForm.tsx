@@ -1,3 +1,4 @@
+import { AddressFields } from "../../../components/common/AddressFields";
 import { Building2 } from "lucide-react";
 import { useRef, useState } from "react";
 import type { FormEvent, ChangeEvent } from "react";
@@ -124,21 +125,19 @@ export function CompanyForm({
             placeholder="Lĩnh vực hoạt động, văn hóa và đội ngũ…"
           />
         </Field>
-        <Field name="address" label="Địa chỉ" error={errors.address}>
-          <input {...props("address")} maxLength={255} />
+        <AddressFields
+          province={values.province}
+          ward={values.ward}
+          errors={errors}
+          onChange={(province, ward) => {
+            setValues((current) => ({ ...current, province, ward }));
+            setErrors((current) => ({ ...current, province: undefined, ward: undefined }));
+            setSaved(false);
+          }}
+        />
+        <Field name="address" label="Địa chỉ cụ thể" error={errors.address}>
+          <input {...props("address")} maxLength={255} placeholder="Ví dụ: 123 Nguyễn Huệ, tầng 3, tòa nhà ABC" />
         </Field>
-        <div className="two-cols">
-          <Field
-            name="province"
-            label="Tỉnh / thành phố"
-            error={errors.province}
-          >
-            <input {...props("province")} maxLength={255} />
-          </Field>
-          <Field name="ward" label="Phường / xã" error={errors.ward}>
-            <input {...props("ward")} maxLength={255} />
-          </Field>
-        </div>
         {error && <ErrorMessage message={error} />}
         {saved && (
           <div className="alert success" role="status">

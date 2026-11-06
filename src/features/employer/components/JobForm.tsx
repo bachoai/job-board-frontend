@@ -1,3 +1,4 @@
+import { AddressFields } from "../../../components/common/AddressFields";
 import {
   MapPin,
   Banknote,
@@ -295,30 +296,21 @@ export function JobForm({
                 <p>Thông tin rõ ràng giúp thu hút ứng viên phù hợp.</p>
               </div>
             </div>
-            <div className="two-cols">
-              <Field
-                name="province"
-                label="Tỉnh / thành phố"
-                error={errors.province}
-              >
-                <input
-                  {...attrs("province")}
-                  maxLength={80}
-                  placeholder="VD: Thành phố Hồ Chí Minh"
-                />
-              </Field>
-              <Field
-                name="location"
-                label="Địa điểm làm việc"
-                error={errors.location}
-              >
-                <input
-                  {...attrs("location")}
-                  maxLength={150}
-                  placeholder="VD: 123 Nguyễn Huệ, phường Sài Gòn"
-                />
-              </Field>
-            </div>
+            <AddressFields
+              province={form.province}
+              ward={form.location}
+              wardName="location"
+              withStreet
+              errors={{ province: errors.province, ward: errors.location }}
+              onChange={(province, location) => {
+                const next = { ...form, province, location };
+                setForm(next);
+                setErrors((current) => ({ ...current, province: undefined, location: undefined }));
+                setError("");
+                setSaved(false);
+                if (!original) saveDraft(userId, next);
+              }}
+            />
             <div className="two-cols">
               <Field
                 name="salaryMin"
@@ -422,7 +414,7 @@ export function JobForm({
           </div>
           <div className="preview-detail">
             <MapPin size={16} />
-            <span>{form.province || form.location || "Địa điểm làm việc"}</span>
+            <span>{[form.location, form.province].filter(Boolean).join(", ") || "Địa điểm làm việc"}</span>
           </div>
           <div className="preview-detail">
             <Banknote size={16} />
