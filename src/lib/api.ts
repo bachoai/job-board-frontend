@@ -170,9 +170,11 @@ export async function api<T>(
 
 /** Download protected CV as a Blob. Never expose the user's token in a URL. */
 export async function apiBlob(path: string, signal?: AbortSignal): Promise<Blob> {
-  const session = await usableSession();
-  if (!session) throw new ApiError("Vui lòng đăng nhập để xem CV.", 401);
+  let requestToken = getSession()?.accessToken;
   try {
+    const session = await usableSession();
+    if (!session) throw new ApiError("Vui lòng đăng nhập để xem CV.", 401);
+    requestToken = session.accessToken;
     const response = await axiosInstance.get<Blob>(path, {
       headers: { Authorization: `Bearer ${session.accessToken}` },
       responseType: "blob",
@@ -194,6 +196,11 @@ export async function apiBlob(path: string, signal?: AbortSignal): Promise<Blob>
     }
     return response.data;
   } catch (error) {
+    if (signal?.aborted) throw error;
+    if (error instanceof ApiError && error.status === 401) {
+      if (getSession()?.accessToken === requestToken) clearSession(expiredMessage);
+      throw new ApiError(expiredMessage, 401);
+    }
     if (error instanceof ApiError) throw error;
     throw new ApiError(
       `Không thể tải tệp CV (${requestLabel("GET", path)}). Kiểm tra kết nối đến backend.`,

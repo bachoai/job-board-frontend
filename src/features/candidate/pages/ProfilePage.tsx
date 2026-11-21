@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { CheckCircle2, Save, UserRound } from "lucide-react";
-import { useAuth } from "../../../app/providers/useAuth";
 import { useResource } from "../../../components/common/useResource";
 import { PageHeading, Loading, ErrorMessage } from "../../../components/common/Feedback";
 import { candidateApi } from "../api/candidate.api";
-import { saveSession } from "../../../lib/api";
+import { getSession, saveSession } from "../../../lib/api";
 
 export function ProfilePage() {
-  const { session } = useAuth();
   const user = useResource(useCallback((signal: AbortSignal) => candidateApi.me(signal), []));
   const [name, setName] = useState(""); const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [success, setSuccess] = useState(false);
@@ -23,7 +21,10 @@ export function ProfilePage() {
     try {
       const updated = await candidateApi.updateMe(user.data.id, { fullName: name.trim(), phone: phone.trim() || null });
       user.setData(updated);
-      if (session) saveSession({ ...session, user: { ...session.user, fullName: updated.fullName } });
+      // The PATCH may renew the access token. Preserve that current session.
+      const current = getSession();
+      if (current && current.user.id === updated.id)
+        saveSession({ ...current, user: { ...current.user, fullName: updated.fullName } });
       setSuccess(true);
     } catch (err) { setError(err instanceof Error ? err.message : "Không thể lưu thông tin."); }
     finally { setBusy(false); }

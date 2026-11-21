@@ -12,7 +12,7 @@ export function loadApi(relativePath, mocks) {
       (_, bindings, specifier) => `const {${bindings}} = require(${JSON.stringify(specifier)});`)
     .replace(/export\s+\{([^}]+)\}\s+from\s+["']([^"']+)["'];?/g,
       (_, bindings, specifier) => bindings.split(',').map(name => `exports.${name.trim()} = require(${JSON.stringify(specifier)}).${name.trim()};`).join('\n'))
-    .replace(/export\s+(const|function|class)\s+(\w+)/g, (_, kind, name) => {
+    .replace(/export\s+(async\s+function|const|function|class)\s+(\w+)/g, (_, kind, name) => {
       names.push(name); return `${kind} ${name}`;
     });
   const exports = {};

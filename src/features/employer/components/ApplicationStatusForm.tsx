@@ -65,8 +65,7 @@ export function ApplicationStatusForm({
             placeholder="Nội dung phản hồi, lịch phỏng vấn…"
           />
           <p className="hint notification-note">
-            Ghi chú được lưu trong lịch sử hồ sơ của ứng viên. Hiện hệ thống
-            chưa gửi email tự động.
+            Ghi chú được lưu trong lịch sử hồ sơ để ứng viên theo dõi phản hồi.
           </p>
           <ConfirmAction
             label="Cập nhật trạng thái"

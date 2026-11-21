@@ -1,4 +1,5 @@
 import { api } from "../../../lib/api";
+import { getAllJobs } from "../../../lib/job-list";
 import type { Job } from "../types";
 import type { JobForm } from "../components/job-form";
 import { jobPayload } from "../components/job-form";
@@ -8,9 +9,8 @@ export const jobsApi = {
       method: "POST",
       body: JSON.stringify(jobPayload(form)),
     }),
-  // AI2 exposes GET /jobs with Bearer authentication, but no /jobs/mine.
   async myJobs(ownerId: number, signal?: AbortSignal): Promise<Job[]> {
-    const jobs = await api<Job[]>("/jobs", { signal });
+    const jobs = await getAllJobs(signal);
     return jobs.filter(job => job.createdBy === ownerId);
   },
   job: (id: number, signal?: AbortSignal) =>

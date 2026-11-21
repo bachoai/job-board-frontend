@@ -1,5 +1,7 @@
 ﻿# Jobboard Frontend — Employer & Admin
 
+> Cập nhật 21/11/2026: đã chạy lại với backend `feature/AI2` mới (`2239cfd`), đủ 41/41 API. Xem [cách chạy fullstack và kết quả xác minh hiện tại](docs/local-fullstack.md). Các giới hạn backend bên dưới phản ánh đợt kiểm tra cũ.
+
 ## Chạy ứng dụng
 
 Yêu cầu Node.js 24+ và npm. Nếu chưa có `.env`:

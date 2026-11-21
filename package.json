@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:fullstack": "node scripts/dev-fullstack.mjs",
     "check:contract": "node scripts/check-api-contract.mjs",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
