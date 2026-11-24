@@ -67,7 +67,7 @@ export function JobApplicationsPage() {
                 (item) => !status || item.status === status,
               )}
               searchText={(item) =>
-                `${item.candidateId} ${item.id} ${item.coverLetter || ""}`
+                `${item.candidateName || ""} ${item.candidateId} ${item.id} ${item.coverLetter || ""}`
               }
               searchLabel="Tìm mã hồ sơ, mã ứng viên…"
               filters={
@@ -91,7 +91,7 @@ export function JobApplicationsPage() {
                   title: "Ứng viên",
                   render: (item) => (
                     <>
-                      <strong>Ứng viên #{item.candidateId}</strong>
+                      <strong>{item.candidateName?.trim() || `Ứng viên #${item.candidateId}`}</strong>
                       <div className="cell-muted">Hồ sơ #{item.id}</div>
                     </>
                   ),

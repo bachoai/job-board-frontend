@@ -10,23 +10,26 @@ import { AiScoreBar } from "../../ai/components/AiScoreBar";
 import { AiSkillsList } from "../../ai/components/AiSkillsList";
 import { AiResumeAnalysis } from "../../ai/components/AiResumeAnalysis";
 import { parsedInfo } from "../../ai/utils/ai";
+import { useParsedResume } from "../../ai/useParsedResume";
+import { ApplyDialog } from "../components/ApplyDialog";
 import { levelLabel } from "../../public/pages/JobCard";
 
 function ResumeMatches({ resumeId }: { resumeId: number }) {
   const [attempt, setAttempt] = useState(0);
   const [showAnalysis, setShowAnalysis] = useState(false);
+  const [applyJob, setApplyJob] = useState<{ jobId: number; title: string } | null>(null);
+  const parsed = useParsedResume(resumeId, attempt > 0);
   const resource = useResource(useCallback(async (signal: AbortSignal) => {
     if (!attempt) return null;
-    const parsed = await aiApi.getParsedResume(resumeId, signal);
-    if (!parsedInfo(parsed)) return { parsed, matches: null };
-    return { parsed, matches: await aiApi.getResumeMatches(resumeId, 10, signal) };
-  }, [resumeId, attempt]));
+    if (!parsedInfo(parsed.data)) return null;
+    return { parsed: parsed.data!, matches: await aiApi.getResumeMatches(resumeId, 10, signal) };
+  }, [resumeId, attempt, parsed.data]));
   return <>
-    <div className="ai-actions"><button className="primary" disabled={attempt > 0 && resource.loading} onClick={() => setAttempt((value) => value + 1)}>
+    <div className="ai-actions"><button className="primary" disabled={attempt > 0 && resource.loading} onClick={() => { parsed.reload(); setAttempt((value) => value + 1); }}>
       <Sparkles size={17}/>{attempt > 0 && resource.loading ? "Đang tìm việc…" : "Tìm việc phù hợp"}
     </button></div>
     {!attempt ? <EmptyState title="Khám phá cơ hội từ CV của bạn"><p>Chọn CV rồi nhấn Tìm việc phù hợp để xem gợi ý từ AI.</p></EmptyState>
-      : resource.loading ? <Loading/> : resource.error ? <ErrorMessage message={resource.error} retry={resource.reload}/>
+      : parsed.loading || resource.loading ? <Loading/> : parsed.error ? <ErrorMessage message={parsed.error} retry={parsed.reload}/> : resource.error ? <ErrorMessage message={resource.error} retry={resource.reload}/>
       : resource.data?.matches ? <>
         <p className="ai-note">Các kết quả AI chỉ là gợi ý, không phải cam kết trúng tuyển.</p>
         {resource.data.matches.items.length ? <div className="ai-match-grid">{resource.data.matches.items.map((job) => <article className="public-job-card ai-match-card" key={job.jobId}>
@@ -37,14 +40,15 @@ function ResumeMatches({ resumeId }: { resumeId: number }) {
           <AiScoreBar score={job.score}/>
           <AiSkillsList title="Kỹ năng đã đáp ứng" skills={job.matchedSkills} tone="matched"/>
           <AiSkillsList title="Kỹ năng còn thiếu" skills={job.missingSkills} tone="missing"/>
-          <Link className="secondary" to={`/jobs/${job.jobId}`}>Xem chi tiết</Link>
+          <div className="ai-actions"><Link className="secondary" to={`/jobs/${job.jobId}`}>Xem chi tiết</Link><button className="primary" onClick={() => setApplyJob(job)}>Ứng tuyển ngay</button></div>
         </article>)}</div> : <EmptyState title="Chưa có việc làm phù hợp"><p>Thử lại sau khi hệ thống có thêm tin tuyển dụng được xử lý.</p></EmptyState>}
-      </> : resource.data && <section className="ai-notice">
-        <h2>{resource.data.parsed.status === "error" ? "CV chưa phân tích được" : "CV đang được xử lý"}</h2>
-        <p>Cần hoàn thành phân tích CV trước khi tìm việc phù hợp.</p>
-        <div className="ai-actions"><button className="secondary" onClick={resource.reload}>Kiểm tra lại</button><button className="secondary" onClick={() => setShowAnalysis((value) => !value)}>Phân tích CV</button><Link className="text-button" to="/me/resumes">Quản lý CV</Link></div>
+      </> : parsed.data && <section className="ai-notice">
+        <h2>{parsed.data.status === "error" ? "CV chưa phân tích được" : "CV đang được xử lý"}</h2>
+        <p>{parsed.timedOut ? "CV đang xử lý, thử lại sau" : "Cần hoàn thành phân tích CV trước khi tìm việc phù hợp. Kết quả sẽ tự cập nhật mỗi 3 giây."}</p>
+        <div className="ai-actions"><button className="secondary" onClick={parsed.reload}>Kiểm tra lại</button><button className="secondary" onClick={() => setShowAnalysis((value) => !value)}>Phân tích CV</button><Link className="text-button" to="/me/resumes">Quản lý CV</Link></div>
         {showAnalysis && <AiResumeAnalysis key={resumeId} resumeId={resumeId}/>}
       </section>}
+    {applyJob && <ApplyDialog jobId={applyJob.jobId} jobTitle={applyJob.title} close={() => setApplyJob(null)}/>}
   </>;
 }
 

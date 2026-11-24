@@ -1,6 +1,6 @@
 ﻿# Jobboard Frontend — Employer & Admin
 
-> Cập nhật 21/11/2026: đã chạy lại với backend `feature/AI2` mới (`2239cfd`), đủ 41/41 API. Xem [cách chạy fullstack và kết quả xác minh hiện tại](docs/local-fullstack.md). Các giới hạn backend bên dưới phản ánh đợt kiểm tra cũ.
+> Cập nhật 25/11/2026: frontend đã triển khai FE-1 đến FE-5 theo hợp đồng AI2. Đối chiếu source backend local `9a3d73f`, kế thừa thay đổi tìm kiếm của bản `90be71d`. Xem [tích hợp AI](docs/ai-integration.md) và [kết quả kiểm thử](docs/ai2-verification.md).
 
 ## Chạy ứng dụng
 
@@ -27,7 +27,7 @@ Chạy backend riêng, mở `/login` hoặc một trang cần dùng và đăng n
 
 Đã tích hợp tìm kiếm việc làm bằng câu tự nhiên, phân tích CV, gợi ý việc làm tại `/me/recommended-jobs`, xếp hạng ứng viên và chấm lại đơn ứng tuyển. Bật/tắt giao diện bằng `VITE_AI_ENABLED`; backend phải bật module AI và có Ollama, RabbitMQ, pgvector cùng dữ liệu embeddings.
 
-Xem [tài liệu tích hợp AI](docs/ai-integration.md) để biết ánh xạ màn hình/API, tệp thay đổi, kết quả kiểm thử và các lỗi quyền/schema cần backend hoàn thiện. AI đã được bật trong môi trường local với Ollama `bge-m3`; health và tìm kiếm hybrid trả 200. Các môi trường khác cần cấu hình và khởi tạo schema riêng.
+Xem [tài liệu tích hợp AI](docs/ai-integration.md) để biết ánh xạ màn hình/API, polling CV, tối ưu tìm kiếm và cấu hình môi trường. Các kiểm chứng cũ không thay thế kết quả chạy hiện tại.
 
 ## Thay đổi giao diện và cấu trúc
 
@@ -40,6 +40,12 @@ Xem [tài liệu tích hợp AI](docs/ai-integration.md) để biết ánh xạ 
 - Xác nhận thao tác, loading, empty/error/success states được dùng chung trên mọi trang.
 - Giữ React + TypeScript + Vite, React Router và CSS của dự án. Thêm Lucide React và dùng Axios đã có sẵn. Giữ logic validation đang hoạt động, không chuyển toàn bộ form sang thư viện khác chỉ để thay giao diện. TypeScript đã bật `strict`.
 - Giữ các trang Public/Candidate và Auth đã ghép trong dự án; các chức năng AI được gắn vào luồng hiện có.
+- Danh sách đơn trả candidateName. Trang chi tiết lấy bổ sung tên từ danh sách được cấp quyền nếu API chi tiết chưa có tên; thiếu tên dùng mã ứng viên.
+- Tìm kiếm AI dùng trực tiếp companyName, jobType, salaryMin, salaryMax và deadline. Response cũ thiếu trường mới được tải chi tiết; giữ thứ tự AI và bỏ tin hết hạn.
+- CV pending được kiểm tra lại mỗi 3 giây trong tối đa 60 giây; chuyển trang/đổi CV hủy timer và request. Lỗi phân tích và lỗi quyền dừng polling.
+- Gợi ý có nút ứng tuyển dùng ApplyDialog hiện có; lỗi trùng đơn/tin đóng vẫn theo API.
+- Giới hạn từ khóa 300 ký tự, thông báo thân thiện khi HTTP 429; ?mode=like|fts|vector|hybrid mặc định hybrid.
+- CV dùng endpoint có xác thực. AI không tự đổi trạng thái hồ sơ. Các thao tác chỉ báo thành công khi API thành công.
 
 ```text
 src/
@@ -109,20 +115,9 @@ src/
 
 Mọi thao tác lỗi đều hiển thị thông báo API; không giả báo thành công. Tin bị chặn không sửa được, hồ sơ đã từ chối không đổi lại được, ngày nộp mới không được nằm trong quá khứ. Các trạng thái theo enum backend; giá trị lạ dùng badge trung tính. AI không tự thay đổi trạng thái đơn ứng tuyển.
 
-## Backend hiện tại và các giới hạn giữ nguyên
-
-- **Sửa công ty:** gọi `PATCH /companies/:id` đúng DTO. Controller backend đang truyền `@CurrentUser('id')` vào service cần `currentUser.id/role`, nên có thể trả 403 kể cả đúng chủ công ty. Frontend hiển thị lỗi và giữ nội dung; không thể sửa lỗi này chỉ bằng UI.
-- **Mở khóa người dùng:** admin dùng `PATCH /users/unlock/:id` qua hộp xác nhận. Danh sách và số liệu được cập nhật sau khi API thành công; lỗi API giữ nguyên trạng thái đã khóa và cho phép thử lại.
-- **Email:** cập nhật hồ sơ hiện chỉ ghi dữ liệu và lịch sử; chưa gửi email tự động. Giao diện không hứa email đã được gửi.
-- **Tin của tôi:** chưa có `/jobs/mine`; dùng `/jobs` có Bearer token rồi lọc `createdBy`. Backend cho employer/admin xem mọi trạng thái khi token hợp lệ. Số hồ sơ lấy qua `/applications?jobId=...`, tối đa 4 yêu cầu đồng thời; khi chưa tải được hiển thị `—`.
-- **Ứng viên:** response hồ sơ chỉ có `candidateId`; hiển thị mã ứng viên thay vì bịa họ tên/email hoặc gọi API người dùng mà employer không có quyền.
-- **CV:** xem/tải qua `GET /resumes/:id/file` có Bearer token. Không dùng URL tĩnh để vượt quyền. Backend AI2 hiện giới hạn chủ CV/admin; xem các vấn đề quyền và lọc CV trong tài liệu AI.
-- **Phiên:** Axios chung tại `lib/axios.ts`; `lib/api.ts` giữ Bearer token, gia hạn, timeout, hủy request và lỗi tiếng Việt. Do `/auth/refresh` cũng cần access token hợp lệ, gia hạn khi token còn dưới 60 giây; nếu đã hết hạn thì đăng nhập lại. Bản nháp tin mới được giữ trong tab theo tài khoản và xóa sau khi tạo thành công.
-- **Sửa tin:** không đổi companyId, giữ currency, gửi null để xóa trường nullable. Không gửi lại hạn cũ không đổi, nên vẫn sửa được tin đã hết hạn. Các lần lưu liên tiếp dùng dữ liệu vừa lưu làm gốc.
-
 ## Kiểm tra
 
-Xem [báo cáo rà soát toàn dự án](docs/project-audit.md) để biết các lỗi backend còn chặn nghiệp vụ, phân quyền CV và kết quả kiểm thử thực tế. `npm run check:contract` đối chiếu các route cần thiết với Swagger; hiện báo thiếu 3 API trên nhánh AI2.
+Xem [báo cáo rà soát](docs/project-audit.md) . `npm run check:contract` kiểm tra các route trong Swagger đang chạy; không chứng minh response hoặc quyền truy cập đúng.
 
 ```powershell
 npm run build

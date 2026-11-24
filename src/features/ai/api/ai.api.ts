@@ -15,6 +15,7 @@ async function aiRequest<T>(path: string, options?: Parameters<typeof api>[1]): 
 
 export const aiApi = {
   searchJobs(query: string, mode: AiSearchMode = "hybrid", limit = 10, signal?: AbortSignal) {
+    if (query.trim().length > 300) return Promise.reject(new ApiError("Từ khóa tìm kiếm tối đa 300 ký tự.", 400));
     const params = new URLSearchParams({ q: query.trim(), mode, limit: String(limit) });
     return aiRequest<AiSearchResult>(`/ai/search?${params}`, {
       auth: false, signal, timeoutMs: mode === "hybrid" || mode === "vector" ? 90000 : undefined,

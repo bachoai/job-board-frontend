@@ -7,6 +7,11 @@ export interface AiSearchHit {
   level: string | null;
   province: string | null;
   location: string | null;
+  companyName?: string | null;
+  jobType?: string | null;
+  salaryMin?: number | null;
+  salaryMax?: number | null;
+  deadline?: string | null;
   score: number;
 }
 export interface AiSearchResult {

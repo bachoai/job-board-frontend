@@ -285,3 +285,147 @@ test("rescore errors are recoverable and unscored remains distinct from a low sc
   await expect(panel.getByRole("progressbar")).toHaveCount(0);
   expect(requests.some(request => request.method === "PATCH")).toBe(false);
 });
+
+
+test("AI2 search uses rich hits without job detail calls and handles nullable fields", async ({ page }) => {
+  const { requests } = await setup(page, "/jobs", "guest");
+  await page.route("**/api/ai/search?*", route => json(route, { items: jobs.slice(0, 2).map((job, i) => ({ ...job, companyName: i ? null : company.name, jobType: i ? null : job.jobType, salaryMin: i ? null : 15000000, salaryMax: i ? null : 25000000, deadline: i ? null : job.deadline, score: 0.5 })) }));
+  await page.getByLabel("Từ khóa tìm việc").fill("Backend");
+  await page.getByRole("button", { name: "Tìm việc", exact: true }).click();
+  await expect(page.locator(".public-job-card")).toHaveCount(2);
+  await expect(page.locator(".public-job-grid")).toContainText(company.name);
+  await expect(page.locator(".public-job-grid")).toContainText("Thỏa thuận");
+  expect(requests.filter(r => /^\/api\/jobs\/\d+$/.test(r.path))).toHaveLength(0);
+});
+
+for (const mode of ["like", "fts", "vector", "hybrid", "invalid"]) test("URL search mode " + mode, async ({ page }) => {
+  await setup(page, "/jobs?mode=" + mode, "guest");
+  let actual = "";
+  await page.route("**/api/ai/search?*", route => { actual = new URL(route.request().url()).searchParams.get("mode") || ""; return json(route, { items: [] }); });
+  await page.getByLabel("Từ khóa tìm việc").fill("Backend");
+  await page.getByRole("button", { name: "Tìm việc", exact: true }).click();
+  await expect(page.getByText("Kết quả tìm kiếm bằng AI", { exact: true })).toBeVisible();
+  expect(actual).toBe(mode === "invalid" ? "hybrid" : mode);
+});
+
+test("429 is friendly and search is limited to 300 characters", async ({ page }) => {
+  await setup(page, "/jobs", "guest");
+  await page.route("**/api/ai/search?*", route => json(route, { message: "Too Many Requests" }, 429));
+  await expect(page.getByLabel("Từ khóa tìm việc")).toHaveAttribute("maxlength", "300");
+  await page.getByLabel("Từ khóa tìm việc").fill("Backend");
+  await page.getByRole("button", { name: "Tìm việc", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Thử lại sau ít phút");
+  await expect(page.getByRole("button", { name: "Tìm kiếm cơ bản", exact: true })).toBeVisible();
+});
+
+test("CV analysis polls pending to done without refresh", async ({ page }) => {
+  await setup(page, "/me/resumes");
+  let calls = 0;
+  await page.route("**/api/ai/resumes/40/parsed", route => json(route, ++calls === 1 ? { ...parsed, status: "pending", data: null } : parsed));
+  await page.locator("article").filter({ hasText: "CV-default.pdf" }).getByRole("button", { name: "Phân tích bằng AI", exact: true }).click();
+  await expect(page.getByText("CV đang được xử lý", { exact: true })).toBeVisible();
+  await expect(page.getByText("Frontend Developer", { exact: true })).toBeVisible({ timeout: 10000 });
+  expect(calls).toBe(2);
+});
+
+test("pending CV stops polling after 60 seconds and explicit retry starts again", async ({ page }) => {
+  await setup(page, "/me/recommended-jobs");
+  await page.clock.install();
+  let calls = 0;
+  await page.route("**/api/ai/resumes/40/parsed", route => { calls++; return json(route, { ...parsed, status: "pending", data: null }); });
+  await page.getByRole("button", { name: "Tìm việc phù hợp", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "CV đang được xử lý", exact: true })).toBeVisible();
+  // Move beyond the deadline, then allow the one scheduled poll to complete.
+  await page.clock.fastForward(61000);
+  await expect(page.getByText("CV đang xử lý, thử lại sau", { exact: true })).toBeVisible();
+  const stopped = calls;
+  await page.clock.fastForward(30000);
+  expect(calls).toBe(stopped);
+  await page.route("**/api/ai/resumes/40/parsed", route => json(route, parsed));
+  await page.getByRole("button", { name: "Kiểm tra lại", exact: true }).click();
+  await expect(page.getByText("Phù hợp cao", { exact: true })).toBeVisible();
+});
+
+test("recommendations poll then submit using the existing apply dialog", async ({ page }) => {
+  await setup(page, "/me/recommended-jobs");
+  let calls = 0;
+  await page.route("**/api/ai/resumes/40/parsed", route => json(route, ++calls === 1 ? { ...parsed, status: "pending", data: null } : parsed));
+  await page.route("**/api/applications", async route => {
+    if (route.request().method() === "POST") { expect(route.request().postDataJSON()).toMatchObject({ jobId: 20, resumeId: 40 }); return json(route, application, 201); }
+    return json(route, [application]);
+  });
+  await page.route("**/api/applications/30/history", route => json(route, []));
+  await page.getByRole("button", { name: "Tìm việc phù hợp", exact: true }).click();
+  await page.getByRole("button", { name: "Ứng tuyển ngay", exact: true }).click({ timeout: 10000 });
+  await expect(page.getByRole("dialog")).toContainText(jobs[0].title);
+  await page.getByRole("button", { name: "Gửi hồ sơ", exact: true }).click();
+  await expect(page).toHaveURL(/\/me\/applications\/30$/);
+});
+
+test("employer sees and searches real candidate names and detail enriches missing name", async ({ page }) => {
+  await setup(page, "/employer/jobs/20/applications", "employer");
+  await page.route("**/api/applications?*", route => json(route, [{ ...application, candidateName: "Nguyễn Minh An" }]));
+  await page.reload();
+  await expect(page.locator("tbody")).toContainText("Nguyễn Minh An");
+  await page.route("**/api/applications/30", route => json(route, application));
+  await page.route("**/api/applications/30/history", route => json(route, []));
+  await page.route("**/api/resumes/40/file", route => json(route, { message: "Unavailable" }, 503));
+  await page.goto("/employer/applications/30?jobId=20");
+  await expect(page.getByRole("heading", { name: "Nguyễn Minh An", exact: true })).toBeVisible();
+  await page.route("**/api/applications/30/status", route => json(route, { ...application, status: "interview" }));
+  await page.getByLabel("Trạng thái mới").selectOption("interview");
+  await page.getByRole("button", { name: "Cập nhật trạng thái", exact: true }).click();
+  await page.getByRole("button", { name: "Xác nhận", exact: true }).click();
+  await expect(page.getByText("Đã cập nhật trạng thái và lịch sử hồ sơ.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Nguyễn Minh An", exact: true })).toBeVisible();
+  // If the optional enrichment fails, the accessible detail still renders its ID fallback.
+  await page.route("**/api/applications?*", route => json(route, { message: "Temporarily unavailable" }, 503));
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Ứng viên #8", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Trạng thái mới")).toBeEnabled();
+});
+
+
+test("changing CV cancels pending polling and never loads stale matches", async ({ page }) => {
+  const { requests } = await setup(page, "/me/recommended-jobs");
+  await page.clock.install();
+  let calls = 0;
+  await page.route("**/api/ai/resumes/40/parsed", route => { calls++; return json(route, { ...parsed, status: "pending", data: null }); });
+  await page.getByRole("button", { name: "Tìm việc phù hợp", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "CV đang được xử lý", exact: true })).toBeVisible();
+  await page.getByLabel("Chọn CV để tìm việc phù hợp").selectOption("42");
+  await page.clock.fastForward(10000);
+  expect(calls).toBe(1);
+  expect(requests.some(r => r.path.endsWith("/40/matches"))).toBe(false);
+  await expect(page.getByRole("heading", { name: "Khám phá cơ hội từ CV của bạn" })).toBeVisible();
+});
+
+test("analysis unmount cancels polling and terminal errors stop retries", async ({ page }) => {
+  await setup(page, "/me/resumes");
+  await page.clock.install();
+  let calls = 0;
+  await page.route("**/api/ai/resumes/40/parsed", route => { calls++; return json(route, { ...parsed, status: "error", data: { error: "CV không hợp lệ" } }); });
+  await page.locator("article").filter({ hasText: "CV-default.pdf" }).getByRole("button", { name: "Phân tích bằng AI", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("CV không hợp lệ");
+  await page.clock.fastForward(10000);
+  expect(calls).toBe(1);
+  await page.route("**/api/ai/resumes/40/parsed", route => { calls++; return json(route, { ...parsed, status: "pending", data: null }); });
+  await page.getByRole("button", { name: "Kiểm tra lại", exact: true }).click();
+  await expect(page.getByText("CV đang được xử lý", { exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Việc làm phù hợp", exact: true }).first().click();
+  const stopped = calls;
+  await page.clock.fastForward(10000);
+  expect(calls).toBe(stopped);
+});
+
+test("mixed rich and legacy hits fetch only incomplete items and preserve ranking", async ({ page }) => {
+  const { requests } = await setup(page, "/jobs", "guest");
+  await page.route("**/api/ai/search?*", route => json(route, { items: [
+    { ...jobs[1], companyName: company.name, score: 0.9 },
+    { id: jobs[0].id, title: jobs[0].title, level: null, province: null, location: null, score: 0.5 },
+  ] }));
+  await page.getByLabel("Từ khóa tìm việc").fill("Backend");
+  await page.getByRole("button", { name: "Tìm việc", exact: true }).click();
+  await expect(page.locator(".public-job-name")).toHaveText([jobs[1].title, jobs[0].title]);
+  expect(requests.filter(r => /^\/api\/jobs\/\d+$/.test(r.path)).map(r => r.path)).toEqual(["/api/jobs/20"]);
+});

@@ -36,6 +36,7 @@ export interface Application {
   id: number;
   jobId: number;
   candidateId: number;
+  candidateName?: string;
   resumeId: number | null;
   coverLetter: string | null;
   status: "new" | "viewed" | "interview" | "rejected";

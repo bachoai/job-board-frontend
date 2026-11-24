@@ -4,17 +4,22 @@ import { BriefcaseBusiness, Search, FilterX, Sparkles } from "lucide-react";
 import { ErrorMessage, Loading, EmptyState } from "../../../components/common/Feedback";
 import { useResource } from "../../../components/common/useResource";
 import { JobCard } from "./JobCard";
-import { publicApi, isOpenJob } from "../api/public.api";
-import { ApiError } from "../../../lib/api";
+import { publicApi } from "../api/public.api";
+import { useSearchParams } from "react-router-dom";
+import type { JobCardData } from "./JobCard";
+import type { AiSearchMode } from "../../ai/types/ai.types";
 import { aiApi } from "../../ai/api/ai.api";
 import { AI_ENABLED } from "../../ai/config";
-import { orderSearchResults } from "../../ai/utils/ai";
-import type { JobPage, JobWithCompany } from "../api/public.api";
+import { resolveSearchJobs } from "../../ai/utils/search-jobs";
+import type { JobPage } from "../api/public.api";
 
 const size = 9;
-type Results = { kind: "list"; data: JobPage } | { kind: "ai" | "basic"; jobs: JobWithCompany[] };
+type Results = { kind: "list"; data: JobPage } | { kind: "ai" | "basic"; jobs: JobCardData[] };
 
 export function JobsPage() {
+  const [params] = useSearchParams();
+  const requestedMode = params.get("mode");
+  const mode: AiSearchMode = requestedMode && ["like", "fts", "vector", "hybrid"].includes(requestedMode) ? requestedMode as AiSearchMode : "hybrid";
   const [draft, setDraft] = useState("");
   const [query, setQuery] = useState("");
   const [province, setProvince] = useState("");
@@ -32,20 +37,9 @@ export function JobsPage() {
   const resource = useResource(useCallback(async (signal: AbortSignal): Promise<Results> => {
     if (!query) return { kind: "list", data: await publicApi.jobs({ page: fetchPage, limit: size, province: serverProvince, level: serverLevel }, signal) };
     if (!useAi) return { kind: "basic", jobs: await publicApi.basicSearch(query, signal) };
-    const hits = await aiApi.searchJobs(query, "hybrid", 50, signal);
-    const ids = [...new Set(hits.items.map((hit) => hit.id))];
-    const jobs: JobWithCompany[] = [];
-    // Keep API ordering; batch requests so 50 hits do not create 50 simultaneous fetches.
-    for (let start = 0; start < ids.length; start += 4) {
-      signal.throwIfAborted();
-      const batch = await Promise.all(ids.slice(start, start + 4).map(async (id) => {
-        try { return await publicApi.job(id, signal); }
-        catch (err) { if (err instanceof ApiError && err.status === 404) return null; throw err; }
-      }));
-      jobs.push(...batch.filter((job): job is JobWithCompany => job !== null && isOpenJob(job)));
-    }
-    return { kind: "ai", jobs: orderSearchResults(hits.items, jobs) };
-  }, [query, useAi, fetchPage, serverProvince, serverLevel]));
+    const hits = await aiApi.searchJobs(query, mode, 50, signal);
+    return { kind: "ai", jobs: await resolveSearchJobs(hits.items, publicApi.job, signal) };
+  }, [query, useAi, mode, fetchPage, serverProvince, serverLevel]));
   const results = resource.data;
   const matched = results && results.kind !== "list" ? results.jobs.filter((job) =>
     (!province || job.province?.toLocaleLowerCase("vi") === province.toLocaleLowerCase("vi")) && (!level || job.level === level)) : [];
@@ -57,7 +51,7 @@ export function JobsPage() {
   const clear = () => { setQuery(""); setDraft(""); setProvince(""); setProvinceDraft(""); setLevel(""); setPage(1); };
   return <main className="public-page">
     <section className="public-hero"><div className="public-hero-copy"><span className="public-kicker"><BriefcaseBusiness size={16}/> CƠ HỘI DÀNH CHO BẠN</span><h1>Tìm công việc <span>phù hợp</span> với hành trình của bạn.</h1><p>Khám phá vị trí đang tuyển dụng, lọc theo địa điểm và cấp bậc để bắt đầu bước tiếp theo.</p></div>
-      <form className="public-search" onSubmit={submitSearch} role="search"><Search size={20}/><input type="search" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Vị trí, kỹ năng, từ khóa…" aria-label="Từ khóa tìm việc"/><button className="primary" type="submit">Tìm việc</button></form>
+      <form className="public-search" onSubmit={submitSearch} role="search"><Search size={20}/><input type="search" maxLength={300} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Vị trí, kỹ năng, từ khóa…" aria-label="Từ khóa tìm việc"/><button className="primary" type="submit">Tìm việc</button></form>
     </section>
     <section className="public-section"><div className="public-heading"><div><span className="public-kicker">KHÁM PHÁ VIỆC LÀM</span><h2>Việc làm đang tuyển</h2><p>{resource.loading ? "Đang tải…" : `${total} vị trí phù hợp${query ? ` với “${query}”` : ""}`}</p></div></div>
       {AI_ENABLED && <div className="ai-mode"><label className="ai-search-toggle"><input type="checkbox" checked={useAi} onChange={(event) => { setUseAi(event.target.checked); setPage(1); }}/><Sparkles size={18}/> Tìm kiếm thông minh bằng AI</label><p className="hint">Mô tả công việc bạn mong muốn bằng ngôn ngữ tự nhiên.</p></div>}

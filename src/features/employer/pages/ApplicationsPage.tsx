@@ -88,7 +88,7 @@ export function ApplicationsPage({ userId }: { userId: number }) {
               )}
               filtered={!!status || !!jobId}
               searchText={(row) =>
-                `${row.id} ${row.candidateId} ${row.jobTitle}`
+                `${row.candidateName || ""} ${row.id} ${row.candidateId} ${row.jobTitle}`
               }
               searchLabel="Tìm mã ứng viên, hồ sơ, vị trí…"
               filters={
@@ -128,7 +128,7 @@ export function ApplicationsPage({ userId }: { userId: number }) {
                     <div className="entity-cell">
                       <span className="entity-avatar violet">UV</span>
                       <div>
-                        <strong>Ứng viên #{row.candidateId}</strong>
+                        <strong>{row.candidateName?.trim() || `Ứng viên #${row.candidateId}`}</strong>
                         <div className="cell-muted">Hồ sơ #{row.id}</div>
                       </div>
                     </div>

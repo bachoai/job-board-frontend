@@ -114,6 +114,14 @@ export function ApplicationDetailPage({ userId }: { userId: number }) {
           throw error;
         });
         const job = await employerApi.job(application.jobId, signal);
+        if (!application.candidateName?.trim()) {
+          // Detail currently omits the name; the authorized list includes it.
+          const list = await employerApi.applications(application.jobId, signal).catch(error => {
+            if (signal.aborted) throw error;
+            return []; // A missing display name must not block reviewing an accessible application.
+          });
+          application.candidateName = list.find(item => item.id === application.id)?.candidateName;
+        }
         return { application, job };
       },
       [id],
@@ -155,7 +163,7 @@ export function ApplicationDetailPage({ userId }: { userId: number }) {
                 <div className="candidate-heading">
                   <span className="avatar">UV</span>
                   <div>
-                    <h2>Ứng viên #{resource.data.application.candidateId}</h2>
+                    <h2>{resource.data.application.candidateName?.trim() || `Ứng viên #${resource.data.application.candidateId}`}</h2>
                     <p>
                       Ứng tuyển{" "}
                       {formatDate(resource.data.application.createdAt, true)}
@@ -186,7 +194,7 @@ export function ApplicationDetailPage({ userId }: { userId: number }) {
                 canEdit={resource.data.job.createdBy === userId}
                 onSaved={(application) => {
                   resource.setData(
-                    (value) => value && { ...value, application },
+                    (value) => value && { ...value, application: { ...application, candidateName: application.candidateName?.trim() || value.application.candidateName } },
                   );
                   setHistoryVersion((value) => value + 1);
                 }}

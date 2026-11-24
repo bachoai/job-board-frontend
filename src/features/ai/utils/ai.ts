@@ -37,6 +37,7 @@ export function aiErrorText(error: unknown): string {
   const message = typeof record.message === "string" ? record.message : "Không thể tải kết quả AI. Vui lòng thử lại.";
   if (record.status === 404 && /Cannot (GET|POST)/i.test(message))
     return "Tính năng AI chưa được bật trên máy chủ. Bạn vẫn có thể sử dụng các chức năng tuyển dụng thông thường.";
+  if (record.status === 429) return "Bạn tìm kiếm quá nhanh. Thử lại sau ít phút.";
   if (record.status === 401) return "Vui lòng đăng nhập lại để sử dụng chức năng AI này.";
   if (record.status === 403) return "Bạn không có quyền xem hoặc xử lý dữ liệu AI này.";
   return message;

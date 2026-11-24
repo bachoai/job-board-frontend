@@ -43,3 +43,16 @@ test('candidate resumes use GET /resumes and exclude CVs owned by another accoun
   assert.deepEqual(Array.from(await candidateApi.resumes(), row => row.id), [2]);
   assert.deepEqual(calls, ['/resumes']);
 });
+
+
+test('search rejects queries beyond 300 characters before making requests', async () => {
+  let calls = 0;
+  const { aiApi } = loadApi('../../src/features/ai/api/ai.api.ts', {
+    '/lib/api': { ApiError, api: async () => { calls++; return {}; } }, '/utils/ai': { aiErrorText },
+  });
+  await assert.rejects(aiApi.searchJobs('a'.repeat(301)), error => error.status === 400);
+  assert.equal(calls, 0);
+  await aiApi.searchJobs('a'.repeat(300));
+  assert.equal(calls, 1);
+  assert.match(aiErrorText({ status: 429 }), /Thử lại sau ít phút/);
+});
